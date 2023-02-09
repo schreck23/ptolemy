@@ -34,21 +34,38 @@ class FsScanner:
         if (self.dbmanager.tableCheck("ptolemy", self.project) == "True"):
             logging.debug("The table for this job already exists, moving on ... ")
         else:
-            self.dbmanager.buildJobTable(self.repo)
+            self.dbmanager.buildJobTable(self.project)
         
-        for root, dirs, files in os.walk(self.directory):
+        for root, dirs, files in os.walk(self.target):
             for file in files:
                 file_path = os.path.join(root, file)
                 file_size = os.path.getsize(file_path)
-                file_modified = os.path.getmtime(file_path)
 
                 if(file_size > self.chunk_size):
                     local_flag = 't'
                 else:
                     local_flag = 'f'
 
-                self.dbmanager.addFileMeta(self.project, file_path, file_size, local_flag, file_modified)
+                self.dbmanager.addFileMeta(self.project, file_path, file_size, local_flag)
 
         self.dbmanager.dbBulkCommit()                    
+
+    #
+    # Method used to tell us how many records (in this case file metadata records) were written to the 
+    # project database.
+    #
+    def printRowCount(self):
+        
+        count = self.dbmanager.getRowCount(self.project)
+        logging.debug("Total files written to the database for project %s is %i" % (self.project, count))
+        
+    #
+    # Cleanup our db connection
+    #
+    def dropDbConnection(self):
         self.dbmanager.closeDbConn()
 
+piece_size = 1073741824
+scanner = FsScanner("/data/raw", "alvin", piece_size)
+scanner.scan()
+scanner.printRowCount()

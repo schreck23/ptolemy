@@ -63,7 +63,7 @@ class DbManager:
     def buildJobTable(self, customer):
 
         command = """
-            CREATE TABLE %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN, mtime TEXT);
+            CREATE TABLE %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
             """
         try:
             self.cursor.execute(command % customer)
@@ -92,14 +92,14 @@ class DbManager:
     #
     # Method used by fsmanager to add a file's metadata to a specific project table.
     #
-    def addFileMeta(self, project, file_id, size, needs_sharding, mtime):
+    def addFileMeta(self, project, file_id, size, needs_sharding):
 
         command = """
-            INSERT INTO %s(file_id, size, needs_sharding, mtime) VALUES(\'%s\', %i, \'%s\', \'%s\')
+            INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
             """        
         try:
-            self.cursor.execute(command % (project, file_id, size, needs_sharding, mtime))
-            logging.debug("Wrote database entry for %s into TABLE %s." % file_id, project)
+            self.cursor.execute(command % (project, file_id, size, needs_sharding))
+            logging.debug("Wrote database entry for %s into TABLE %s." % (file_id, project))
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
             logging.error(error)
@@ -339,5 +339,19 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
 
-    def flagItemEncrypted():
-        print("Body coming soon ... ")
+    #
+    #
+    #
+    def getRowCount(self, project):
+        
+        try:
+            command = """
+                SELECT COUNT(*) FROM %s;
+                """
+            self.cursor.execute(command % project)
+            count = self.cursor.fetchone()[0]
+
+            return count
+
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)
