@@ -5,6 +5,11 @@ Created on Wed Feb  8 11:02:33 2023
 
 @author: schreck
 """
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: schreck
+"""
 
 import os
 import dbmanager
