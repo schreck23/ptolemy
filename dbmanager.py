@@ -29,7 +29,38 @@ class DbManager:
         dbversion = self.cursor.fetchone()
         logging.debug("Using postgres database version: " + str(dbversion))
 
+    #
+    # Method used to maintain all project related metadata.
+    #
+    def buildProjectTable(self):
+        
+        command = """
+            CREATE TABLE ptolemy_projects (project TEXT PRIMARY KEY, shard_size INT, car_size INT, encryption TEXT, staging_dir TEXT, target_dir TEXT, load_type TEXT);
+            """
+        try:
+            self.cursor.execute(command)
+            self.conn.commit()
+            logging.debug("Created table ptolemy_projects for storage of project metadata.")
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)        
 
+    #
+    # Stores a project instance with high-level metadata to help job execution.
+    #
+    def insertProject(self, project, shard_size, car_size, encryption, staging_dir, target_dir, load_type):
+
+        command = """
+        INSERT INTO ptolemy_projects (project, shard_size, car_size, encryption, staging_dir, target_dir, load_type) VALUES (\'%s\', %i, %i, \'%s\', \'%s\', \'%s\', \'%s\');
+        """
+        
+        try:
+            self.cursor.execute(command % (project, shard_size, car_size, encryption, staging_dir, target_dir, load_type))
+            self.conn.commit()
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)            
+            
     #
     # Method used by the fsmanager to create a table for each project as a job is launched.
     #
@@ -46,7 +77,132 @@ class DbManager:
             self.conn.rollback()
             logging.error(error)
 
+    #
+    # Method used by Ptolemy to keep track of the workers.
+    #
+    def buildWorkerTable(self):
+        
+        command = """
+            CREATE TABLE ptolemy_workers (ip_addr TEXT PRIMARY KEY, port TEXT, active BOOLEAN);
+            """
+        try:
+            self.cursor.execute(command)
+            self.conn.commit()
+            logging.debug("Creating worker table for Ptolemy orchestrator.")
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)
             
+    #
+    # Add a worker to the database for maintenance
+    #
+    def addWorker(self, ip_addr, port):
+        
+        command = """
+        INSERT INTO ptolemy_workers (ip_addr, port, active) VALUES (\'%s\', \'%s\', 't');
+        """
+        try:
+            self.cursor.execute(command % (ip_addr, port))
+            self.conn.commit()
+            logging.debug("Adding worker with IP Address of: %s" % ip_addr)
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)
+
+    #
+    # Fail worker
+    #
+    def failWorker(self, ip_addr, port):
+        
+        command = """
+        UPDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
+        """
+        try:
+            self.cursor.execute(command % (ip_addr, port))
+            self.conn.commit()            
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)    
+            
+    #
+    # If a worker was marked down and wishes to register we ensure we can
+    # make him active again.
+    #
+    def activateWorker(self, ip_addr, port):
+        
+        command = """
+        UPDATE ptolemy_workers SET active = 't' WHERE ip_addr = '%s' AND port = '%s';
+        """
+        try:
+            self.cursor.execute(command % (ip_addr, port))
+            self.conn.commit()            
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)    
+            
+    #
+    # Method used to get the type of project we are running.  If it is serial
+    # car files are produced and shipped in a serial fashion.  If the method is
+    # blitz it will generate and send car files in parallel threads.  The blitz
+    # method will use a lot more disk and RAM/CPU.
+    #
+    def getProjectLoadType(self, project):
+        
+        command = """
+        SELECT load_type FROM ptolemy_projects WHERE project = '%s';
+        """
+        try:
+            self.cursor.execute(command % project)
+            result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)
+        
+    #
+    # Method used to grab the target directory of a project we wish to scan.
+    #
+    def getProjectTargetDir(self, project):
+        
+        command = """
+        SELECT target_dir, shard_size FROM ptolemy_projects WHERE project = '%s';
+        """
+        try:
+            self.cursor.execute(command % project)
+            result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)        
+    
+    #
+    # Check to see if worker has already been registered
+    #
+    def workerCheck(self, ip_addr, port):
+        
+        command = """
+        SELECT COUNT(1) FROM ptolemy_workers WHERE ip_addr = '%s' AND port = '%s';
+        """
+        try:
+            self.cursor.execute(command % (ip_addr, port))
+            result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)        
+
+    #
+    # Method used to get the list of workers that are active.
+    #
+    def getWorkerList(self):
+        
+        command = """
+        SELECT * FROM ptolemy_workers WHERE active = 't';
+        """
+        try:
+            self.cursor.execute(command)
+            result = self.cursor.fetchall()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)
+        
     #
     # Method used by fsmanager to add a file's metadata to a specific project table.
     #
@@ -56,8 +212,9 @@ class DbManager:
             INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
             """        
         try:
-            self.cursor.execute(command % (project, file_id, size, needs_sharding))
             logging.debug("Wrote database entry for %s into TABLE %s." % (file_id, project))
+            self.cursor.execute(command % (project, file_id, size, needs_sharding))
+            self.conn.commit()
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
             logging.error(error)
@@ -113,3 +270,68 @@ class DbManager:
 
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
+            
+    #
+    # This method is used to extract a series of logged files for processing to make
+    # a car file.  If it has not been added to a carfile and is properly sized (i.e. already
+    # sharded or too small to shard) then grab the file id.
+    #
+    def getListOfFilesForCar(self, customer):
+
+        command = """
+            SELECT file_id, size, is_encrypted, shard_index FROM %s WHERE carfile = ' ' AND needs_sharding = 'f';
+            """
+        try:
+            self.cursor.execute(command % (customer))
+            result = self.cursor.fetchmany(3000)
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)
+    
+    #
+    # Method used to designate container a file will live in (think car file)
+    #
+    def setFileContainer(self, project, file, carfile):
+
+        command = """
+            UPDATE %s SET carfile = '%s' WHERE file_id = '%s';
+            """
+        try:
+            self.cursor.execute(command % (project, carfile, file))
+            logging.debug("Updating entry for %s in project %s in carfile %s." % (file, project, carfile))
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)
+
+    #
+    # Method used to create car tracking table.
+    #
+    def buildCarTable(self):
+        
+        command = """
+            CREATE TABLE ptolemy_cars (car_id TEXT PRIMARY KEY, cid TEXT, project TEXT, commp TEXT, processed BOOLEAN);
+            """
+        try:
+            self.cursor.execute(command)
+            self.conn.commit()
+            logging.debug("Created table ptolemy_cars for storage of carfile metadata.")
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)        
+
+    #
+    # Method used to add a car file to the tracking table.
+    #
+    def addCarFile(self, project, car_name):
+        
+        command = """
+            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed) VALUES (\'%s\', \'%s\', ' ', ' ', 'f');
+            """
+        try:
+            self.cursor.execute(command % (car_name, project))
+            self.conn.commit()
+            logging.debug("Added entry for carfile %s to the database for project %s." % (car_name, project))
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)
+            
