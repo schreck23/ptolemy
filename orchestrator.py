@@ -13,19 +13,17 @@ import os
 import requests
 import fsscanner
 import subprocess
-import configparser
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/home/wfschrec/ptolemy.log')
+
+logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
-
-config = configparser.ConfigParser()
 
 #
 # Method used to check for system databases and create them if they do not
@@ -85,19 +83,7 @@ def heartbeatWorker():
             time.sleep(15)
         
         dbmgr.closeDbConn()
-
-#
-#
-#
-def parseConfiguration():
-    global config
-    config.read('orchestrator.ini')
     
-#
-# Invoke config parser for orchestrator
-#
-parseConfiguration()
-
 #
 # Check for and build any necessary tables before launch.
 #

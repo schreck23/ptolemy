@@ -12,7 +12,7 @@ import time
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/home/wfschrec/ptolemy.log')
+logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
@@ -96,3 +96,5 @@ async def addCarToQueue(car_name: str):
 #
 #
 #
+@app.post("/v0/")
+async def ():
