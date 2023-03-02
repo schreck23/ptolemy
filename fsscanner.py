@@ -75,6 +75,7 @@ class FsScanner:
                             file_cache.append(iter[0])
                             self.dbmanager.setFileContainer(self.project, iter[0], basename)
                         else:
+                            self.dbmanager.addCarFile(self.project, basename)
                             self.dbmanager.dbBulkCommit()
                             logging.debug("Building car file for car dir: " + basename)
                             basename = self.generateRandomArchiveName()
@@ -82,7 +83,7 @@ class FsScanner:
                             size = 0
 
             matrix = self.dbmanager.getListOfFilesForCar(self.project)       
-            
+        self.dbmanager.addCarFile(self.project, basename)
         self.dbmanager.dbBulkCommit()
         
     #

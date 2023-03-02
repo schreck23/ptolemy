@@ -216,7 +216,6 @@ class DbManager:
             self.cursor.execute(command % (project, file_id, size, needs_sharding))
             self.conn.commit()
         except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
             logging.error(error)
 
 
@@ -300,7 +299,6 @@ class DbManager:
             self.cursor.execute(command % (project, carfile, file))
             logging.debug("Updating entry for %s in project %s in carfile %s." % (file, project, carfile))
         except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
             logging.error(error)
 
     #
@@ -332,6 +330,5 @@ class DbManager:
             self.conn.commit()
             logging.debug("Added entry for carfile %s to the database for project %s." % (car_name, project))
         except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
             logging.error(error)
             

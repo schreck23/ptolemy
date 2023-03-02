@@ -13,7 +13,7 @@ import os
 import requests
 import fsscanner
 import subprocess
-import signal
+import configparser
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException
@@ -25,21 +25,28 @@ logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/
 app = FastAPI()
 app = fastapi.FastAPI()
 
+config = configparser.ConfigParser()
+
+#
+# Method used to check for system databases and create them if they do not
+# exist.
+#
 def rootTableCheck():
     
     dbmgr = dbmanager.DbManager()
         
-    if (dbmgr.tableCheck("ptolemy", "ptolemy_workers") == "True"):
+    if (dbmgr.tableCheck("ptolemy", "ptolemy_workers")):
         logging.debug("Ptolemy worker table exists, moving on ... ")
     else:
         dbmgr.buildWorkerTable()
 
-    if (dbmgr.tableCheck("ptolemy", "ptolemy_cars") == "True"):
+    if (dbmgr.tableCheck("ptolemy", "ptolemy_cars")):
         logging.debug("Ptolemy cars table exists, moving on ... ")
     else:
         dbmgr.buildCarTable()
         
     dbmgr.closeDbConn()
+
 #
 # This method will read a list of workers from the database and ping them
 # every 15 seconds to ensure the worker is functioning.  If the ping fails the 
@@ -62,7 +69,7 @@ def heartbeatWorker():
             for worker in workers:
                 if(worker[2]):
                     try:
-                        url = "http://" + worker[0] + ":" + worker[1] + "/heartbeat/"
+                        url = "http://" + worker[0] + ":" + worker[1] + "/v0/heartbeat/"
                         response = requests.get(url)
                         if response.status_code == 200:
                             logging.debug("Worker alive!")
@@ -78,6 +85,18 @@ def heartbeatWorker():
             time.sleep(15)
         
         dbmgr.closeDbConn()
+
+#
+#
+#
+def parseConfiguration():
+    global config
+    config.read('orchestrator.ini')
+    
+#
+# Invoke config parser for orchestrator
+#
+parseConfiguration()
 
 #
 # Check for and build any necessary tables before launch.
@@ -146,7 +165,7 @@ async def define_project(project: str, metadata: Project):
 # This call will invoke a scan of the target filesystem and place all the metadata
 # in the database.
 #
-@app.post("/v0/scan/{project}")
+@app.post("/v0/exe/{project}")
 async def launch_fsscanner(project: str):    
 
     heartbeat_pid = os.fork()
@@ -169,21 +188,6 @@ async def launch_fsscanner(project: str):
         except(Exception) as error:
             raise HTTPException(status_code=500, detail=str(error))            
             os._exit(0)
-
-    #return {"message" : "Launching filesystem and scan and processing files in the background."}
-
-    #piece_size = 1073741824
-    #scanner = FsScanner("/data/raw", "alvin", piece_size)
-    #scanner.scan()
-    #scanner.printRowCount()
-#    result = dbmgr.getProjectLoadType(project)
-#
-#    if(result[0] == 'serial'):
-#        logging.debug("Launching a serial processing job for project %s with registered workers." % project)
-#    elif(result[0] == 'blitz'):
-#        logging.debug("Launching a parallel processing job for project %s with registered workers." % project)
-#    else:
-#        raise HTTPException(status_code=500, detail=str("Unable to locate the project metadata for project: %s") % project)
 
 #
 # This method represents the private key for an rsa pair being downloaded after
