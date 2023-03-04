@@ -9,6 +9,7 @@ import dbmanager
 import logging
 import random
 import string
+import time
 
 from concurrent.futures.thread import ThreadPoolExecutor
 
@@ -76,6 +77,8 @@ class FsScanner:
                             self.dbmanager.setFileContainer(self.project, iter[0], basename)
                         else:
                             self.dbmanager.addCarFile(self.project, basename)
+                            logging.debug("Issuing bulk commit in fsscanner.")
+                            time.sleep(5)
                             self.dbmanager.dbBulkCommit()
                             logging.debug("Building car file for car dir: " + basename)
                             basename = self.generateRandomArchiveName()
@@ -84,6 +87,8 @@ class FsScanner:
 
             matrix = self.dbmanager.getListOfFilesForCar(self.project)       
         self.dbmanager.addCarFile(self.project, basename)
+        logging.debug("Issuing bulk commit in fsscanner.")
+        time.sleep(5)      
         self.dbmanager.dbBulkCommit()
         
     #

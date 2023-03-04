@@ -316,6 +316,21 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
             logging.error(error)        
+            
+    #
+    # Get a list of cars by project for worker priming.
+    #
+    def getProjectCarFiles(self, project):
+        
+        command = """
+            SELECT car_id FROM ptolemy_cars WHERE project = '%s';
+            """
+        try:
+            self.cursor.execute(command % project)
+            result = self.cursor.fetchall()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)    
 
     #
     # Method used to add a car file to the tracking table.
@@ -323,7 +338,7 @@ class DbManager:
     def addCarFile(self, project, car_name):
         
         command = """
-            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed) VALUES (\'%s\', \'%s\', ' ', ' ', 'f');
+            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f');
             """
         try:
             self.cursor.execute(command % (car_name, project))

@@ -46,6 +46,17 @@ def rootTableCheck():
     dbmgr.closeDbConn()
 
 #
+# Get list of workers we can use.
+#
+def workerListPull():
+    
+    dbmgr = dbmanager.DbManager()
+    workers = dbmgr.getWorkerList()
+    dbmgr.closeDbConn()
+
+    return workers
+
+#
 # This method will read a list of workers from the database and ping them
 # every 15 seconds to ensure the worker is functioning.  If the ping fails the 
 # worker will be marked inactive.  We will fork the heartbeat process so as 
@@ -214,7 +225,7 @@ async def clean_key(alias:str):
 # This method is used to generate a new x5098 certificate for encryption
 #
 @app.get("/v0/newx509key/{alias}")
-async def return_x509key(alias:str):
+async def return_x509key(alias: str):
     key_command = "openssl req -x509 -nodes -days 36500 -newkey rsa:2048 -keyout /keys/%s_private_key.pem -out /keys/%s_public_key.pem -subj /C=ZZ/O=protocol.ai/OU=outercore/CN=ptolemy"
     key_result = subprocess.run((key_command % (alias, alias)), shell=True)
     if(key_result == 0):
@@ -224,31 +235,40 @@ async def return_x509key(alias:str):
             os.remove("")
         except(Exception) as error:
             raise HTTPException(status_code=500, detail=str(error))
-#
-# Our structure by which we will receive our key file
-#
-class EncKey(BaseModel):
-    kind: str
     
 #
-# This method will allow a user to upload a public key for encryption 
 #
-@app.put("/v0/addkey/{alias}")
-async def addPublicKey(enckey: EncKey, file: UploadFile):
+#
+def primeWorkers(project):
+    dbmgr = dbmanager.DbManager()
+    workers = dbmgr.getWorkerList()
+    
+    if(len(workers) == 0):
+        logging.debug("No workers present, priming cannot be completed.")
+    else:
+        car_files = dbmgr.getProjectCarFiles(project)
+        while(len(car_files) > 0 and len(workers) > 0):
+            for worker in workers:
+                url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + car_files.pop(0)[0]
+                response = requests.post(url)
+                if response.status_code == 200:
+                    logging.debug("Sent car file to worker.")
+                else:
+                    logging.debug("Marking worker with IP: %s as down" % worker[0])
+                    dbmgr.failWorker(worker[0], worker[1])
+                    workers = dbmgr.getWorkerList()
+    
+    
+#
+#
+#
+@app.post("/v0/blitz/{project}")
+async def blitzBuild(project: str):
+    primeWorkers(project)
+    
+#
+#
+#
+@app.post("/v0/serial/{project}")
+async def serialBuild():
     print("")
-
-#
-# Requestor structure to respond to worker request for key
-#
-class KeyRequestor(BaseModel):
-    ip_addr: str
-    port: str
-    
-#
-# This method will return to a worker the encryption key needed for a specific
-# job.
-#
-@app.get("/v0/jobkey/{alias}")
-async def getKeyToWorker():
-    print("")
-    
