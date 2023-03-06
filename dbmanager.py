@@ -214,7 +214,6 @@ class DbManager:
         try:
             logging.debug("Wrote database entry for %s into TABLE %s." % (file_id, project))
             self.cursor.execute(command % (project, file_id, size, needs_sharding))
-            self.conn.commit()
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
 

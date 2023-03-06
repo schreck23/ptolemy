@@ -100,7 +100,8 @@ class FsScanner:
     def scan(self):
 
         futures = []
-
+        trigger = 0
+        
         if (self.dbmanager.tableCheck("ptolemy", self.project) == "True"):
             logging.debug("The table for this job already exists, moving on ... ")
         else:
@@ -119,7 +120,11 @@ class FsScanner:
                     local_flag = 'f'
 
                 self.dbmanager.addFileMeta(self.project, file_path, file_size, local_flag)
-        
+                trigger += 1
+                
+                if (trigger == 5000):
+                    self.dbmanager.dbBulkCommit()
+                    
         for future in futures:
             future.result()
         
