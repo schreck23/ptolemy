@@ -124,7 +124,7 @@ class FsScanner:
                 
                 if (trigger == 5000):
                     self.dbmanager.dbBulkCommit()
-                    
+                    trigger = 0
         for future in futures:
             future.result()
         
