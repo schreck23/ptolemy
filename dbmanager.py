@@ -347,3 +347,19 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
             
+    #
+    # This method is used to extract a series of logged files for processing to make
+    # a car file.  If it has not been added to a carfile and is properly sized (i.e. already
+    # sharded or too small to shard) then grab the file id.
+    #
+    def getCarBuildList(self, project, car_name):
+
+        command = """
+            SELECT file_id, size FROM %s WHERE carfile = \'%s\' ;
+            """
+        try:
+            self.cursor.execute(command % (project, car_name))
+            result = self.cursor.fetchall()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)

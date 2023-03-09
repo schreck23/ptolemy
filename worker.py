@@ -10,9 +10,11 @@ import logging
 import requests
 import time
 import configparser
+import dbmanager
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile
+from concurrent.futures.thread import ThreadPoolExecutor
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
@@ -95,14 +97,61 @@ async def returnHeartbeat():
     workip = config.get('worker', 'ip_addr')
     workport = config.get('worker', 'port')
     logging.debug("Worker %s with port %s is alive and well." % (workip, workport))
-    
+
 #
 #
 #
-@app.post("/v0/carfile/{car_name}")
-async def addCarToQueue(car_name: str):
+class carFile(BaseModel):
+    car_name: str
+
+#
+#
+#
+@app.post("/v0/carfile/{project}")
+async def addCarToQueue(project: str, car: carFile):
     global the_highway
-    the_highway.enqueue(car_name)
-    print(the_highway.highway)
-    logging.debug("Adding car named %s to the highway." % car_name)
+    pair = [project, car]
+    the_highway.enqueue(pair)
+    logging.debug("Adding car named %s to the highway." % car)
+
+def createCarFromDb(project, car_name):
+    dbmgr = dbmanager.DbManager()
+    matrix = dbmgr.getCarBuildList(project, car_name)    
+    file_name = "/tmp/" + car_name + ".json"
+    count = len(matrix)
     
+    with open(file_name, 'w') as jsonfile:
+        jsonfile.write('[\n')
+        indexer = 0
+        for iter in matrix:
+            indexer += 1
+            if(indexer == count):
+                jsonfile.write('{\n')
+                jsonfile.write('\"Path\":\"%s\",\n' % iter[0])
+                jsonfile.write('\"Size\": %i\n' % iter[1])
+                jsonfile.write('}\n')
+            else:
+                jsonfile.write('{\n')
+                jsonfile.write('\"Path\":\"%s\",\n' % iter[0])
+                jsonfile.write('\"Size\": %i\n' % iter[1])
+                jsonfile.write('},\n')
+        jsonfile.write(']')
+        jsonfile.close()                
+
+#
+#
+#
+@app.post("/v0/carblitz/{project}")
+async def runCarBlitz(project: str):
+    global the_highway
+    global config
+    
+    executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
+    futures = []
+    
+    for iter in the_highway.highway:
+        if(iter[0] == project):
+            futures.append(executor.submit(createCarFromDb, iter[0], iter[1].car_name))
+
+    for future in futures:
+        future.result()

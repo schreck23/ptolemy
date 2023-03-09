@@ -179,7 +179,6 @@ async def launch_fsscanner(project: str):
             scanner = fsscanner.FsScanner(result[0], project, piece_size)
             scanner.scan()
             scanner.containerize()
-            dbmgr.dbBulkCommit()
             logging.debug("Done with processing filesystem for project %s." % project)
             os._exit(0)
         except(Exception) as error:
@@ -249,15 +248,32 @@ def primeWorkers(project):
         car_files = dbmgr.getProjectCarFiles(project)
         while(len(car_files) > 0 and len(workers) > 0):
             for worker in workers:
-                url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + car_files.pop(0)[0]
-                response = requests.post(url)
+                url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
+                car_data = {"car_name" : car_files.pop(0)[0]}
+                response = requests.post(url, json=car_data)
                 if response.status_code == 200:
                     logging.debug("Sent car file to worker.")
                 else:
                     logging.debug("Marking worker with IP: %s as down" % worker[0])
                     dbmgr.failWorker(worker[0], worker[1])
                     workers = dbmgr.getWorkerList()
-    
+
+#
+#
+#
+@app.post("/v0/containerize/{project}")
+async def containerizeCars(project: str):
+    try:
+        dbmgr = dbmanager.DbManager()
+        result = dbmgr.getProjectTargetDir(project)
+        piece_size = 1024 * 1024 * 1024 * result[1]
+        scanner = fsscanner.FsScanner(result[0], project, piece_size)
+        scanner.containerize()
+        logging.debug("Done with processing filesystem for project %s." % project)
+        os._exit(0)
+    except(Exception) as error:
+        raise HTTPException(status_code=500, detail=str(error))            
+        os._exit(0)    
     
 #
 #
