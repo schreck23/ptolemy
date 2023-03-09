@@ -297,6 +297,7 @@ class DbManager:
             """
         try:
             self.cursor.execute(command % (project, carfile, file))
+            self.conn.commit()
             logging.debug("Updating entry for %s in project %s in carfile %s." % (file, project, carfile))
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
