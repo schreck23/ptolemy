@@ -278,7 +278,7 @@ class DbManager:
     def getListOfFilesForCar(self, customer):
 
         command = """
-            SELECT file_id, size, is_encrypted, shard_index FROM %s WHERE carfile = ' ' AND needs_sharding = 'f';
+            SELECT file_id, size, is_encrypted, shard_index FROM %s WHERE carfile = ' ' AND needs_sharding = 'f' AND size > 0;
             """
         try:
             self.cursor.execute(command % (customer))
