@@ -282,7 +282,7 @@ class DbManager:
             """
         try:
             self.cursor.execute(command % (customer))
-            result = self.cursor.fetchmany(3000)
+            result = self.cursor.fetchmany(100000)
             return result
         except(Exception, psycopg2.DatabaseError) as error:
             logging.debug(error)
