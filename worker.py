@@ -114,6 +114,9 @@ async def addCarToQueue(project: str, car: carFile):
     the_highway.enqueue(pair)
     logging.debug("Adding car named %s to the highway." % car)
 
+#
+#
+#
 def createCarFromDb(project, car_name):
     dbmgr = dbmanager.DbManager()
     matrix = dbmgr.getCarBuildList(project, car_name)
@@ -129,17 +132,19 @@ def createCarFromDb(project, car_name):
             indexer += 1
             if(indexer == count):
                 jsonfile.write('{\n')
-                jsonfile.write('\"Path\": \"%s\",\n' % iter[0])
                 
                 if('.part' in iter[0]):
                     original = iter[0].split('.part')
                     if(dbmgr.rootFileCheck(project, original[0]) > 0):
+                        jsonfile.write('\"Path\": \"%s\",\n' % original[0])
                         if(int(original[1]) == 0):
                             jsonfile.write('\"Start\": 0,\n')
                             jsonfile.write('\"End\": %i,\n' % piece_size - 1)
                         else:
                             jsonfile.write('\"Start\": %i,\n' % (piece_size * int(original[1])))
-                            jsonfile.write('\"End\": %i,\n' % piece_size  * int(original[1]) + iter[1])                            
+                            jsonfile.write('\"End\": %i,\n' % piece_size  * int(original[1]) + iter[1])
+                    else:
+                        jsonfile.write('\"Path\": \"%s\",\n' % iter[0])                            
                 jsonfile.write('\"Size\": %i\n' % iter[1])
                 jsonfile.write('}\n')
             else:
@@ -148,12 +153,15 @@ def createCarFromDb(project, car_name):
                 if('.part' in iter[0]):
                     original = iter[0].split('.part')
                     if(dbmgr.rootFileCheck(project, original[0]) > 0):
+                        jsonfile.write('\"Path\": \"%s\",\n' % original[0])
                         if(int(original[1]) == 0):
                             jsonfile.write('\"Start\": 0,\n')
                             jsonfile.write('\"End\": %i,\n' % piece_size - 1)
                         else:
                             jsonfile.write('\"Start\": %i,\n' % (piece_size * int(original[1])))
-                            jsonfile.write('\"End\": %i,\n' % piece_size  * int(original[1]) + iter[1])                
+                            jsonfile.write('\"End\": %i,\n' % piece_size  * int(original[1]) + iter[1])
+                    else:
+                        jsonfile.write('\"Path\": \"%s\",\n' % iter[0])
                 jsonfile.write('\"Size\": %i\n' % iter[1])
                 jsonfile.write('},\n')
         jsonfile.write(']')
