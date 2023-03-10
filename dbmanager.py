@@ -364,3 +364,20 @@ class DbManager:
             return result
         except(Exception, psycopg2.DatabaseError) as error:
             logging.debug(error)
+            
+    #
+    #
+    #
+    def rootFileCheck(self, project, file_name):
+        
+        command = """
+            SELECT COUNT(*) FROM %s WHERE file_id = \'%s\';
+            """
+        try:
+            self.cursor.execute(command % (project, file_name))
+            result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)        
+            
+    
