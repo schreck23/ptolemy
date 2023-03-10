@@ -78,8 +78,6 @@ class FsScanner:
                         else:
                             self.dbmanager.addCarFile(self.project, basename)
                             logging.debug("Issuing bulk commit in fsscanner.")
-                            time.sleep(5)
-                            self.dbmanager.dbBulkCommit()
                             logging.debug("Building car file for car dir: " + basename)
                             basename = self.generateRandomArchiveName()
                             file_cache = []
@@ -88,8 +86,6 @@ class FsScanner:
             matrix = self.dbmanager.getListOfFilesForCar(self.project)       
         self.dbmanager.addCarFile(self.project, basename)
         logging.debug("Issuing bulk commit in fsscanner.")
-        time.sleep(5)      
-        self.dbmanager.dbBulkCommit()
         
     #
     # Method used to scan a file system and write all relevant file metadata
