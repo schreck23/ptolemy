@@ -12,6 +12,7 @@ import time
 import configparser
 import dbmanager
 import os
+import subprocess
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile
@@ -168,6 +169,34 @@ def createCarFromDb(project, car_name):
         jsonfile.write(']')
         jsonfile.close()   
 
+
+#
+# Method to split one file at a time.
+#
+def singleSplit(target_file, staging, piece_size):
+    command = "ln -s %s %s"
+    
+    with open(target_file, 'rb') as infile:
+        index = 0
+        while True:
+            chunk = infile.read(piece_size)
+            if not chunk:
+                break
+            chunk_path = target_file + ".part" + str(index)
+                
+            target = os.path.join(staging, chunk_path[1:])
+            with open(target, 'wb') as outfile:
+                outfile.write(chunk)
+                outfile.close()
+            outcome = subprocess.run((command % (chunk_path, target)), shell=True)
+            if(outcome.returncode == 0):
+                logging.debug("Creating softlink for: %s" % chunk_path)
+            else:
+                logging.error("Softlink creation for %s failed!" % chunk_path)
+                break
+            index += 1
+    infile.close()    
+    
 #
 # 
 #             
@@ -176,26 +205,14 @@ def blitzSplitter(project):
     result = dbmgr.splitList(project)
     project_meta = dbmgr.getProjectTargetDir(project)
     piece_size = 1024 * 1024 * 1024 * project_meta[1]
+    executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     
+    futures = []    
     for iter in result:
         root = os.path.split(iter[0])        
         os.makedirs(os.path.join(project_meta[2], root[0][1:]), exist_ok=True)
-
-        with open(iter[0], 'rb') as infile:
-            index = 0
-            while True:
-                chunk = infile.read(piece_size)
-                if not chunk:
-                    break
-                chunk_path = iter[0] + ".part" + str(index)
-                
-                target = os.path.join(project_meta[2], chunk_path[1:])
-                with open(target, 'wb') as outfile:
-                    outfile.write(chunk)
-                    outfile.close()
-                index += 1
-        infile.close()
-
+        futures.append(executor.submit(singleSplit, iter[0], project_meta[2], piece_size))
+        
 #
 #
 #
@@ -206,7 +223,6 @@ async def runCarBlitz(project: str):
  
     blitzSplitter(project)
     
-"""
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
     
@@ -216,4 +232,3 @@ async def runCarBlitz(project: str):
 
     for future in futures:
         future.result()
-"""
