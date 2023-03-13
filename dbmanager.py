@@ -164,7 +164,7 @@ class DbManager:
     def getProjectTargetDir(self, project):
         
         command = """
-        SELECT target_dir, shard_size FROM ptolemy_projects WHERE project = '%s';
+        SELECT target_dir, shard_size, staging_dir FROM ptolemy_projects WHERE project = '%s';
         """
         try:
             self.cursor.execute(command % project)
@@ -380,4 +380,20 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.debug(error)        
             
+    #
+    #
+    #
+    def splitList(self, project):
+        
+        command = """
+            SELECT file_id FROM %s WHERE needs_sharding = 't';
+            """
+            
+        try:
+            self.cursor.execute(command % project)
+            result = self.cursor.fetchall()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)                
+    
     

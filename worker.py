@@ -11,6 +11,7 @@ import requests
 import time
 import configparser
 import dbmanager
+import os
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile
@@ -165,7 +166,35 @@ def createCarFromDb(project, car_name):
                 jsonfile.write('\"Size\": %i\n' % iter[1])
                 jsonfile.write('},\n')
         jsonfile.write(']')
-        jsonfile.close()                
+        jsonfile.close()   
+
+#
+# 
+#             
+def blitzSplitter(project):
+    dbmgr = dbmanager.DbManager()
+    result = dbmgr.splitList(project)
+    project_meta = dbmgr.getProjectTargetDir(project)
+    piece_size = 1024 * 1024 * 1024 * project_meta[1]
+    
+    for iter in result:
+        root = os.path.split(iter[0])        
+        os.makedirs(os.path.join(project_meta[2], root[0][1:]), exist_ok=True)
+
+        with open(iter[0], 'rb') as infile:
+            index = 0
+            while True:
+                chunk = infile.read(piece_size)
+                if not chunk:
+                    break
+                chunk_path = iter[0] + ".part" + str(index)
+                
+                target = os.path.join(project_meta[2], chunk_path[1:])
+                with open(target, 'wb') as outfile:
+                    outfile.write(chunk)
+                    outfile.close()
+                index += 1
+        infile.close()
 
 #
 #
@@ -174,7 +203,10 @@ def createCarFromDb(project, car_name):
 async def runCarBlitz(project: str):
     global the_highway
     global config
+ 
+    blitzSplitter(project)
     
+"""
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
     
@@ -184,3 +216,4 @@ async def runCarBlitz(project: str):
 
     for future in futures:
         future.result()
+"""
