@@ -162,7 +162,7 @@ def singleSplit(target_file, staging, piece_size):
             with open(target, 'wb') as outfile:
                 outfile.write(chunk)
                 outfile.close()
-            outcome = subprocess.run((command % (chunk_path, target)), shell=True)
+            outcome = subprocess.run((command % (target, chunk_path)), shell=True)
             if(outcome.returncode == 0):
                 logging.debug("Creating softlink for: %s" % chunk_path)
             else:
