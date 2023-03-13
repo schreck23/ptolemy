@@ -195,9 +195,8 @@ async def runCarBlitz(project: str):
     global the_highway
     global config
  
-    blitzSplitter(project)
+#    blitzSplitter(project)
 
-"""    
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
     
@@ -207,4 +206,3 @@ async def runCarBlitz(project: str):
 
     for future in futures:
         future.result()
-"""
