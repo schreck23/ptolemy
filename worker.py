@@ -186,7 +186,26 @@ def blitzSplitter(project):
         root = os.path.split(iter[0])        
         os.makedirs(os.path.join(project_meta[2], root[0][1:]), exist_ok=True)
         futures.append(executor.submit(singleSplit, iter[0], project_meta[2], piece_size))
-        
+
+#
+#
+#
+def packDirectory(project, car_name):        
+    dbmgr = dbmanager.DbManager()
+    project_meta = dbmgr.getProjectTargetDir(project)
+    piece_size = 1024 * 1024 * 1024 * project_meta[1]
+    matrix = dbmgr.getCarBuildList(project, car_name)
+    base = project_meta[2] + car_name
+    os.mkdir(base)
+    
+    command = "ln -s %s %s"
+    
+    for iter in matrix:
+        root = os.path.split(iter[0])
+        os.makedirs(os.path.join(project_meta[2], root[0][1:]), exist_ok=True)
+        link = project_meta[2] + iter[0][1:]
+        subprocess.run((command % (iter[0],link)),shell=True)
+
 #
 #
 #
@@ -199,10 +218,10 @@ async def runCarBlitz(project: str):
 
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
-    
+
     for iter in the_highway.highway:
         if(iter[0] == project):
-            futures.append(executor.submit(createCarFromDb, iter[0], iter[1].car_name))
-
+            #futures.append(executor.submit(createCarFromDb, iter[0], iter[1].car_name))
+            futures.append(executor.submit(packDirectory, iter[0], iter[1].car_name))
     for future in futures:
         future.result()
