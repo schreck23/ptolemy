@@ -286,6 +286,18 @@ class DbManager:
             return result
         except(Exception, psycopg2.DatabaseError) as error:
             logging.debug(error)
+            
+    def getDesiredCarSize(self, project):
+
+        command = """
+            SELECT car_size FROM ptolemy_projects WHERE project = \'%s\';
+            """
+        try:
+            self.cursor.execute(command % (project))
+            result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.debug(error)
     
     #
     # Method used to designate container a file will live in (think car file)
@@ -293,7 +305,7 @@ class DbManager:
     def setFileContainer(self, project, file, carfile):
 
         command = """
-            UPDATE %s SET carfile = '%s' WHERE file_id = '%s';
+            UPDATE %s SET carfile = '%s' WHERE file_id = \'%s\';
             """
         try:
             self.cursor.execute(command % (project, carfile, file))
@@ -324,7 +336,7 @@ class DbManager:
     def getProjectCarFiles(self, project):
         
         command = """
-            SELECT car_id FROM ptolemy_cars WHERE project = '%s';
+            SELECT car_id FROM ptolemy_cars WHERE project = \'%s\';
             """
         try:
             self.cursor.execute(command % project)

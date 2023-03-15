@@ -55,9 +55,10 @@ class FsScanner:
     #
     def containerize(self):
         
-        max_size = 30 * 1073741824        
         basename = self.generateRandomArchiveName()
         matrix = self.dbmanager.getListOfFilesForCar(self.project)
+        car_size = self.dbmanager.getDesiredCarSize(self.project)
+        max_size = 1024 * 1024 * 1024 * car_size[0]
         size = 0
         file_cache = []
         
