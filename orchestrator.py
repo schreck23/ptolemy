@@ -144,7 +144,7 @@ class Project(BaseModel):
 #
 @app.post("/v0/scan/{project}")
 async def scan_fs(project: str, background_tasks: BackgroundTasks):
-    dbmgr = dbmanager.DbManager(project)
+    dbmgr = dbmanager.DbManager()
     result = dbmgr.getProjectTargetDir(project)
     piece_size = 1024 * 1024 * 1024 * result[1]
     scanner = fsscanner.FsScanner(result[0], project, piece_size)
