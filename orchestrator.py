@@ -15,7 +15,7 @@ import fsscanner
 import subprocess
 
 from pydantic import BaseModel
-from fastapi import FastAPI, File, UploadFile, status, HTTPException
+from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 
@@ -140,6 +140,26 @@ class Project(BaseModel):
     load_type: str
 
 #
+#
+#
+@app.post("/v0/scan/{project}")
+async def scan_fs(project: str, background_tasks: BackgroundTasks):
+    dbmgr = dbmanager.DbManager(project)
+    result = dbmgr.getProjectTargetDir(project)
+    piece_size = 1024 * 1024 * 1024 * result[1]
+    scanner = fsscanner.FsScanner(result[0], project, piece_size)
+    background_tasks.add_task(invokeScanner, scanner, project)
+    return {"message": "Scanning async underway."}
+
+#
+#
+#
+def invokeScanner(scanner, project):
+    scanner.scan()
+    logging.debug("Scanning has been completed for project %s." % project)
+    return {"message": "Scanning has completed."}
+    
+#
 # Method used to define and store job metadata with the database.
 #
 @app.post("/v0/create/{project}")
@@ -178,6 +198,7 @@ async def launch_fsscanner(project: str):
             piece_size = 1024 * 1024 * 1024 * result[1]
             scanner = fsscanner.FsScanner(result[0], project, piece_size)
             scanner.scan()
+            dbmgr.dbBulkCommit()
             scanner.containerize()
             logging.debug("Done with processing filesystem for project %s." % project)
             os._exit(0)

@@ -13,6 +13,7 @@ import configparser
 import dbmanager
 import os
 import subprocess
+import shutil
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile
