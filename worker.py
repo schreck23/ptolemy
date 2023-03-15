@@ -195,15 +195,15 @@ def packDirectory(project, car_name):
     project_meta = dbmgr.getProjectTargetDir(project)
     piece_size = 1024 * 1024 * 1024 * project_meta[1]
     matrix = dbmgr.getCarBuildList(project, car_name)
-    base = project_meta[2] + car_name
+    base = os.path.join(project_meta[2], car_name)
     os.mkdir(base)
     
     command = "ln -s %s %s"
     
     for iter in matrix:
         root = os.path.split(iter[0])
-        os.makedirs(os.path.join(project_meta[2], root[0][1:]), exist_ok=True)
-        link = project_meta[2] + iter[0][1:]
+        os.makedirs(os.path.join(base, root[0][1:]), exist_ok=True)
+        link = os.path.join(base, iter[0][1:])
         subprocess.run((command % (iter[0],link)),shell=True)
 
 #
