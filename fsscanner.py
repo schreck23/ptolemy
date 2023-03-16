@@ -27,6 +27,7 @@ class FsScanner:
         self.project = task
         self.chunk_size = threshold
         self.executor = ThreadPoolExecutor(64)
+        self.pool = Pool(processes=64)
     
     #
     #
@@ -89,9 +90,6 @@ class FsScanner:
         self.dbmanager.addCarFile(self.project, basename)
         logging.debug("Issuing bulk commit in fsscanner.")
         
-    def addMetaToDb(self, project, path, size, local_flag):
-        self.dbmanager.addFileMeta(project, path, size, local_flag)
-        
     #
     # Method used to scan a file system and write all relevant file metadata
     # to the database.  We are only concerned about the file size, last mod date
@@ -100,6 +98,9 @@ class FsScanner:
     #
     def scan(self):
 
+        def addMetaToDb(self, project, path, size, local_flag):
+            self.dbmanager.addFileMeta(project, path, size, local_flag)
+        
         futures = []
         
         if (self.dbmanager.tableCheck("ptolemy", self.project) == "True"):
@@ -115,10 +116,12 @@ class FsScanner:
                 if(file_size > self.chunk_size):
                     local_flag = 't'
                     file_size = 0
-                    futures.append(self.executor.submit(self.processLargeFile, file_path))
+                    self.pool.apply_async(self.processLargeFile, file_path)
+                    #futures.append(self.executor.submit(self.processLargeFile, file_path))
                 else:
                     local_flag = 'f'
-                futures.append(self.addMetaToDb, self.project, file_path, file_size, local_flag)
+                    self.pool.apply_async(addMetaToDb, self.project, file_path, file_size, local_flag)
+                #futures.append(self.addMetaToDb, self.project, file_path, file_size, local_flag)
                 #self.dbmanager.addFileMeta(self.project, file_path, file_size, local_flag)
                     
         for future in futures:

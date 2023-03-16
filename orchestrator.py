@@ -148,6 +148,7 @@ async def scan_fs(project: str, background_tasks: BackgroundTasks):
     result = dbmgr.getProjectTargetDir(project)
     piece_size = 1024 * 1024 * 1024 * result[1]
     scanner = fsscanner.FsScanner(result[0], project, piece_size)
+    
     background_tasks.add_task(invokeScanner, scanner, project)
     return {"message": "Scanning async underway."}
 
