@@ -89,7 +89,10 @@ class FsScanner:
             matrix = self.dbmanager.getListOfFilesForCar(self.project)       
         self.dbmanager.addCarFile(self.project, basename)
         logging.debug("Issuing bulk commit in fsscanner.")
-        
+
+def addMetaToDb(self, project, path, size, local_flag):
+    self.dbmanager.addFileMeta(project, path, size, local_flag)       
+    
     #
     # Method used to scan a file system and write all relevant file metadata
     # to the database.  We are only concerned about the file size, last mod date
@@ -97,9 +100,6 @@ class FsScanner:
     # we commit the data to the database and then we can process the entire filesystem.
     #
     def scan(self):
-
-        def addMetaToDb(self, project, path, size, local_flag):
-            self.dbmanager.addFileMeta(project, path, size, local_flag)
         
         futures = []
         
