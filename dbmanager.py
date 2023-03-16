@@ -30,6 +30,16 @@ class DbManager:
         logging.debug("Using postgres database version: " + str(dbversion))
 
     #
+    # Used to execute a generic command
+    #
+    def execute_command(self, command):
+        try:
+            self.cursor.execute(command)
+        except(Exception, psycopg2.DatabaseError) as error:
+            self.conn.rollback()
+            logging.error(error)        
+            
+    #
     # Method used to maintain all project related metadata.
     #
     def buildProjectTable(self):
@@ -242,6 +252,15 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
 
+    #
+    # Method used to commit a series of transactions in bulk
+    #
+    def db_bulk_commit(self):
+
+        try:
+            self.conn.commit()
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)
 
     #
     # Method used to commit a series of transactions in bulk
@@ -408,4 +427,10 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.debug(error)                
     
-    
+    #
+    # Gracefully close our database connection
+    #
+    def close_db_conn(self):
+
+        if self.conn is not None:
+            self.conn.close()    
