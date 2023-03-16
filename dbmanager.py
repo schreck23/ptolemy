@@ -42,8 +42,9 @@ class DbManager:
     #
     #
     #
-    def exe_fetch(self):
+    def exe_fetch_one(self, command):
         try:
+            self.cursor.execute(command)
             self.cursor.fetch()
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error) 

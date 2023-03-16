@@ -105,8 +105,7 @@ def scan_task(project: str):
         meta_command = """
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\'
             """
-        dbmgr.execute_command(meta_command % project)
-        metadata = dbmgr.exe_fetch()
+        metadata = dbmgr.exe_fetch_one(meta_command % project)
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
