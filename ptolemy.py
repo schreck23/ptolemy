@@ -49,7 +49,7 @@ async def define_project(project: str, metadata: Project):
     dbmgr = dbmanager.DbManager()
 
     try:
-        create_command = """"
+        create_command = """
             CREATE TABLE IF NOT EXISTS ptolemy_projects (project TEXT PRIMARY KEY, shard_size INT, car_size INT, encryption TEXT, staging_dir TEXT, target_dir TEXT, load_type TEXT, status TEXT);
             """
         dbmgr.execute_command(create_command)
