@@ -66,7 +66,16 @@ async def define_project(project: str, metadata: Project):
 #
 #
 #
-def process_large_file(path, chunk_size):
+def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
+    command = """
+        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
+        """
+    dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
+
+#
+#
+#
+def process_large_file(dbmgr, project, path, chunk_size):
 
     with open(path, 'rb') as infile:
         index = 0
@@ -76,17 +85,9 @@ def process_large_file(path, chunk_size):
                 break
                 chunk_path = path + ".ptolemy" + str(index)
                 file_size = len(chunk)
+                write_file_meta(dbmgr, project, chunk_path, file_size, 'f')
                 #self.dbmanager.addFileMeta(self.project, chunk_path, file_size, 'f')
                 index += 1        
-
-#
-#
-#
-def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
-    command = """
-        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
-        """
-    dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
 
 #
 #
@@ -105,6 +106,7 @@ def scan_task(project: str):
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\'
             """
         metadata = dbmgr.execute_command(meta_command % project)
+        
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
@@ -125,10 +127,10 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        pool.apply_async(write_file_meta, project, file_path, 0, 't')            
-                        pool.apply_async(process_large_file, file_path, chunk_size)
+                        pool.apply_async(write_file_meta, dbmgr, project, file_path, 0, 't')            
+                        pool.apply_async(process_large_file, dbmgr, project, file_path, chunk_size)
                     else:
-                        pool.apply_async(write_file_meta, project, file_path, file_size, 'f')
+                        pool.apply_async(write_file_meta, dbmgr, project, file_path, file_size, 'f')
 
             dbmgr.db_bulk_commit()
         else:
