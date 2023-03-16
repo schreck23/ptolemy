@@ -20,11 +20,14 @@ from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from multiprocessing import Pool
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
+
+pool = Pool(processes=8)
 
 #
 # Used to configure a job and store any related job metadata to ensure 
@@ -101,15 +104,17 @@ def scan_task(project: str):
 
     dbmgr = dbmanager.DbManager()
     global pool
+    
     try:
         meta_command = """
-            SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\'
+            SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
         metadata = dbmgr.exe_fetch_one(meta_command % project)
+    
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
-                UPDATE ptolemy_projects SET status = 'executing scan' WHERE project = \'%s\'
+                UPDATE ptolemy_projects SET status = 'executing scan' WHERE project = \'%s\';
                 """
             dbmgr.execute_command(status_command % project)
             chunk_size = 1024 * 1024 * 1024 * metadata[0]
