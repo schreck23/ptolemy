@@ -15,6 +15,8 @@ import os
 import requests
 import fsscanner
 import subprocess
+import random
+import string
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
@@ -49,9 +51,8 @@ class Project(BaseModel):
 @app.post("/v0/create/{project}")
 async def define_project(project: str, metadata: Project):
 
-    dbmgr = dbmanager.DbManager()
-
     try:
+        dbmgr = dbmanager.DbManager()
         create_command = """
             CREATE TABLE IF NOT EXISTS ptolemy_projects (project TEXT PRIMARY KEY, shard_size INT, car_size INT, encryption TEXT, staging_dir TEXT, target_dir TEXT, load_type TEXT, status TEXT);
             """
@@ -67,7 +68,8 @@ async def define_project(project: str, metadata: Project):
         raise HTTPException(status_code=500, detail=str(error))            
 
 #
-#
+# Template method used to write each file or file shard's metadata to the database
+# for retention.
 #
 def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
     command = """
@@ -76,7 +78,8 @@ def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
     dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
 
 #
-#
+# Useed by the scan method this will determine the appropriate splits for any files
+# that exceed the threshold for the project as described in the database.
 #
 def process_large_file(dbmgr, project, path, chunk_size):
 
@@ -89,23 +92,28 @@ def process_large_file(dbmgr, project, path, chunk_size):
                 chunk_path = path + ".ptolemy" + str(index)
                 file_size = len(chunk)
                 write_file_meta(dbmgr, project, chunk_path, file_size, 'f')
-                #self.dbmanager.addFileMeta(self.project, chunk_path, file_size, 'f')
                 index += 1        
 
 #
-#
+# This method will invoke the full scan of a project's target directory.  Upon 
+# completion (which can be timely based on structure size) the metadata of all
+# the files contained within the structure are written to the database.  This will
+# also calculate the file splits along boundaries to help with containerization.
 #
 @app.post("/v0/scan/{project}")
 async def project_scan(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(scan_task, project)
     return {"message": "Connecting to database and starting filesystem scan."}
 
+#
+# The scan method used by our route above.
+#
 def scan_task(project: str):
 
-    dbmgr = dbmanager.DbManager()
     global pool
     
     try:
+        dbmgr = dbmanager.DbManager()
         meta_command = """
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
@@ -125,6 +133,8 @@ def scan_task(project: str):
             dbmgr.db_bulk_commit()
             
             # scan the filesystem and capture the metadata
+            # very straight forward, logic will dictate if a file exceeds chunk/shard size
+            # then we must break it and track the chunks as well
             for root, dirs, files in os.walk(metadata[1]):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -137,6 +147,7 @@ def scan_task(project: str):
                         pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
 
             dbmgr.db_bulk_commit()
+            dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
         
@@ -144,3 +155,90 @@ def scan_task(project: str):
         dbmgr.close_db_conn()
         raise HTTPException(status_code=500, detail=str(error))            
 
+#
+# Method used to generate random container names to prevent collisions.
+#
+def generate_car_name(self):
+    alphabet = string.ascii_letters
+    return ''.join(random.choice(alphabet) for i in range(10))
+
+#
+# Helper method used in containerize to allow for subprocesses,
+# this will add a container to the table for tracking.
+#
+def add_container(dbmgr, project, car_name):
+    add_command = """            
+        INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f');
+        """
+    dbmgr.execute_command(add_command % (project, car_name))
+    
+#
+# Helper method used to assign a container to a specific file entry
+# in the database.
+#
+def set_container(dbmgr, project, file, car_name):
+    container_command = """
+        UPDATE %s SET carfile = '%s' WHERE file_id = \'%s\';
+        """    
+    dbmgr.execute_command(container_command % (project, file, car_name))
+    
+#
+# Containerize and create boundaries for the car files.
+#
+@app.post("/v0/containerize/{project}")
+def containerize_structure(project: str):
+    
+    global pool
+    
+    try:
+        dbmgr = dbmanager.DbManager()
+        
+        # get our shard sizing, planned unit is GiB 
+        chunk_command = """
+            SELECT shard_size FROM ptolemy_projects WHERE project = \'%s\';
+            """
+        size = dbmgr.exe_fetch_one(chunk_command % project) * 1024 * 1024 * 1024
+        
+        #
+        # If a file has a size of 0 it is larger than the chunk size and therefore we ignore it and worry only about the shards.  
+        # In the meantime start grabbing swaths of files that have yet to be assigned to a container.
+        # We will ask for the following to help with container computation:
+        #   Filename - so we can update that entry in the database and set the carfile name
+        #   Size - so we can work up a tally and ensure we align with the container sizing.
+        #
+        fetch_command = """
+            SELECT file_id, size, shard_index FROM %s WHERE carfile = ' ' AND needs_sharding = 'f' AND size > 0;
+            """
+        
+        # locals to keep track of file list and size to ensure breaking along boundaries
+        processed = 0
+        car_cache = []
+        car_name = generate_car_name()
+
+        # grab 300K of the files at a time, we don't want to grab millions and overwhealm the service
+        matrix = dbmgr.exe_fetch_many(fetch_command % project, 300000)
+        
+        while (len(matrix) > 0):
+            for iter in matrix:
+        
+                if(int(iter[1]) > 0):
+                    if ((processed + int(iter[1])) < size):
+                        processed += int(iter[1])
+                        car_cache.append(iter[0])
+                        pool.apply_async(set_container, args=(dbmgr, project, iter[0], car_name))      
+                    else:
+                        pool.apply_async(add_container, args=(dbmgr, project, car_name))
+                        car_name = generate_car_name()
+                        car_cache = []
+                        processed = 0
+
+            # processed first 300K, check and see if there are any more to process
+            matrix = dbmgr.exe_fetch_many(fetch_command % project, 300000)
+
+        pool.apply_async(add_container, args=(dbmgr, project, car_name))
+        dbmgr.db_bulk_commit()        
+        
+    except(Exception) as error:
+        dbmgr.close_db_conn()
+        raise HTTPException(status_code=500, detail=str(error))
+        

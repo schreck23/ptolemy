@@ -23,7 +23,7 @@ class DbManager:
     #
     # Returns postgres database version, that's it, that's the tweet :)
     #
-    def dbVersion(self):
+    def db_version(self):
 
         self.cursor.execute('SELECT version()')
         dbversion = self.cursor.fetchone()
@@ -40,12 +40,34 @@ class DbManager:
             logging.error(error) 
             
     #
-    #
+    # Used to execute a command and return a solitary result
     #
     def exe_fetch_one(self, command):
         try:
             self.cursor.execute(command)
             result = self.cursor.fetchone()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error) 
+    
+    #
+    # Used to execute a command and return all results
+    #
+    def exe_fetch_all(self, command):
+        try:
+            self.cursor.execute(command)
+            result = self.cursor.fetchall()
+            return result
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error) 
+            
+    #
+    # Used to execute a command and return a specified number of results
+    #
+    def exe_fetch_many(self, command, count):
+        try:
+            self.cursor.execute(command)
+            result = self.cursor.fetchmany(count)
             return result
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error) 
