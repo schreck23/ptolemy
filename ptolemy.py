@@ -108,7 +108,7 @@ def scan_task(project: str):
         metadata = dbmgr.execute_command(meta_command % project)
         
         # Make sure we get something back or fire out a 404
-        if(len(metadata) > 0):
+        if(len(metadata[0]) > 0):
             status_command = """
                 UPDATE ptolemy_projects SET status = 'executing scan' WHERE project = \'%s\'
                 """
