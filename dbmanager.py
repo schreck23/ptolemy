@@ -37,7 +37,16 @@ class DbManager:
             self.cursor.execute(command)
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
-            logging.error(error)        
+            logging.error(error) 
+            
+    #
+    #
+    #
+    def exe_fetch(self):
+        try:
+            self.cursor.fetch()
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error) 
             
     #
     # Method used to maintain all project related metadata.
