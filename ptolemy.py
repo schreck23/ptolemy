@@ -131,10 +131,10 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        pool.apply_async(write_file_meta, dbmgr, project, file_path, 0, 't')            
-                        pool.apply_async(process_large_file, dbmgr, project, file_path, chunk_size)
+                        pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, 0, 't'))      
+                        pool.apply_async(process_large_file, args=(dbmgr, project, file_path, chunk_size))
                     else:
-                        pool.apply_async(write_file_meta, dbmgr, project, file_path, file_size, 'f')
+                        pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
 
             dbmgr.db_bulk_commit()
         else:
