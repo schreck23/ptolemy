@@ -76,6 +76,7 @@ def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
         INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
         """
     dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
+    logging.debug("Wrote meta for file: %s" % file_id)
 
 #
 # Useed by the scan method this will determine the appropriate splits for any files
@@ -143,9 +144,11 @@ def scan_task(project: str):
                     if(file_size > chunk_size):
                         pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, 0, 't'))      
                         pool.apply_async(process_large_file, args=(dbmgr, project, file_path, chunk_size))
+                        logging.debug("Adding large file: %s" % file_path)
                     else:
                         pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
-
+                        logging.debug("Adding small file: %s" % file_path)
+                        
             pool.close()
             pool.join()
 
