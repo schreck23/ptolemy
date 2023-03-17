@@ -146,7 +146,11 @@ def scan_task(project: str):
                     else:
                         pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
 
+            pool.close()
+            pool.join()
+
             dbmgr.db_bulk_commit()
+            dbmgr.cursor_close()
             dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
@@ -241,4 +245,80 @@ def containerize_structure(project: str):
     except(Exception) as error:
         dbmgr.close_db_conn()
         raise HTTPException(status_code=500, detail=str(error))
+
+#
+# Worker data structure, represents a worker running with a specific
+# IP address port combination.
+#
+class Worker(BaseModel):
+    ip_addr: str
+    port: str
+
+#
+# Route used by a worker to register for car generation workloads.
+#
+@app.post("/v0/worker/")
+def register_worker(worker: Worker, background_tasks: BackgroundTasks):
+    try:
+
+        dbmgr = dbmanager.DbManager()
+        create_command = """
+            CREATE TABLE IF NOT EXISTS ptolemy_workers (ip_addr TEXT PRIMARY KEY, port TEXT, active BOOLEAN);
+            """
+        dbmgr.execute_command(create_command)
+        dbmgr.db_bulk_commit()
+
+        check_command = """
+            SELECT COUNT(1) FROM ptolemy_workers WHERE ip_addr = '%s' AND port = '%s';
+            """
+        result = dbmgr.exe_fetch_one(check_command % (worker.ip_addr, worker.port))
+        
+        if(result[0] > 0):
+            activate_command = """
+                UPDATE ptolemy_workers SET active = 't' WHERE ip_addr = '%s' AND port = '%s';
+                """
+            dbmgr.execute_command(activate_command % (worker.ip_addr, worker.port))
+            dbmgr.db_bulk_commit()
+        else:
+            add_command = """
+                NSERT INTO ptolemy_workers (ip_addr, port, active) VALUES (\'%s\', \'%s\', 't');
+                """
+            dbmgr.execute_command(add_command % (worker.ip_addr, worker.port))
+            dbmgr.db_bulk_commit()
+            
+        
+    except(Exception) as error:
+        dbmgr.close_db_conn()
+        raise HTTPException(status_code=500, detail=str(error))
+
+#
+# Background task to monitor a worker that has registered with Ptolemy
+#        
+def worker_heartbeat(worker: Worker):
+    
+    active_heartbeat = True 
+    
+    while(active_heartbeat):
+        try:
+            dbmgr = dbmanager.DbManager()
+            url = "http://" + worker.ip_addr + ":" + worker.port + "/v0/heartbeat/"
+            response = requests.get(url)
+            if response.status_code == 200:
+                logging.debug("Received response from %s on port %s."  % (worker.ip_addr, worker.port))
+            else:
+                active_heartbeat = False
+                logging.error("Marking worker with IP %s and port %s as down" % (worker.ip_addr, worker.port))
+                
+                fail_cmd = """
+                    PDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
+                    """
+                dbmgr.execute_command(fail_cmd % (worker.ip_addr, worker.port))
+                dbmgr.db_bulk_commit()
+            dbmgr.closeDbConn()
+
+        except(Exception) as error:
+            logging.error(error)
+            active_heartbeat = False
+            dbmgr.closeDbConn()        
+        time.sleep(15)
         

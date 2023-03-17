@@ -73,6 +73,15 @@ class DbManager:
             logging.error(error) 
             
     #
+    # Used to execute a command and return a specified number of results
+    #
+    def cursor_close(self):
+        try:
+            self.cursor.close()
+        except(Exception, psycopg2.DatabaseError) as error:
+            logging.error(error)     
+            
+    #
     # Method used to maintain all project related metadata.
     #
     def buildProjectTable(self):
