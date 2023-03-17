@@ -148,8 +148,10 @@ def scan_task(project: str):
                     else:
                         pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
                         logging.debug("Adding small file: %s" % file_path)
-                        
+            
+            logging.debug("Calling pool.close()")
             pool.close()
+            logging.debug("Calling pool.join()")
             pool.join()
 
             dbmgr.db_bulk_commit()
