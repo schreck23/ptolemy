@@ -93,10 +93,14 @@ async def project_scan(project: str, background_tasks: BackgroundTasks):
     return {"message": "Connecting to database and starting filesystem scan."}
 
 #
-# Template method used to write each file or file shard's metadata to the database
-# for retention.
+# Helper method for redundancy and multiproessing
 #
-
+def write_file_meta(project, file_id, size, needs_sharding):
+    command = """
+        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
+        """
+    psql_cursor.execute(command % (project, file_id, size, needs_sharding))
+    logging.debug("Wrote meta for file: %s" % file_id)    
 
 #
 # Useed by the scan method this will determine the appropriate splits for any files
@@ -112,23 +116,13 @@ def process_large_file(project, path, chunk_size):
                 break
                 chunk_path = path + ".ptolemy" + str(index)
                 file_size = len(chunk)
-                #write_file_meta(project, chunk_path, file_size, 'f')
+                write_file_meta(project, chunk_path, file_size, 'f')
                 index += 1        
 
 #
 # The scan method used by our route above.
 #
 def scan_task(project: str):
-
-    #
-    # Helper method for redundancy and multiproessing
-    #
-    def write_file_meta(project, file_id, size, needs_sharding):
-        command = """
-            INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
-            """
-        psql_cursor.execute(command % (project, file_id, size, needs_sharding))
-        logging.debug("Wrote meta for file: %s" % file_id)    
 
     pool = Pool(processes=8)    
 
