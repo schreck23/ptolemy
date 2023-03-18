@@ -29,17 +29,25 @@ from multiprocessing import Pool
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 #
-# Database settings we wish to leverage
-#
-psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
-psql_cursor = psql_conn.cursor()
-
-#
 # FastAPI for our HTTP routes
 #
 app = FastAPI()
 app = fastapi.FastAPI()
 
+
+if __name__ == "__main__":
+    #
+    # Database settings we wish to leverage
+    #
+    psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+    psql_cursor = psql_conn.cursor()
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8000,
+    )    
+    
 #
 # Used to configure a job and store any related job metadata to ensure 
 # the operation is handled properly.  It should be noted shard_size and car_size
@@ -165,6 +173,8 @@ def scan_task(project: str):
             pool.close()
             logging.debug("Calling pool.join()")
             pool.join()
+
+            psql_cursor.commit()
 
             #dbmgr.db_bulk_commit()
             #dbmgr.cursor_close()
