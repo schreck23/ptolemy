@@ -179,7 +179,7 @@ def scan_task(project: str):
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
         
     except(Exception) as error:
-        dbmgr.close_db_conn()
+        #dbmgr.close_db_conn()
         raise HTTPException(status_code=500, detail=str(error))            
 
 #
