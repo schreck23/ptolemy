@@ -26,6 +26,8 @@ from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from multiprocessing import Pool
 
+from concurrent.futures.thread import ThreadPoolExecutor
+
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 #
@@ -34,13 +36,9 @@ logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/
 app = FastAPI()
 app = fastapi.FastAPI()
 
+executor = ThreadPoolExecutor(8)
 
-if __name__ == "__main__":
-    #
-    # Database settings we wish to leverage
-    #
-    psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
-    psql_cursor = psql_conn.cursor()
+dbmgr = dbmanager.DbManager()
     
 #
 # Used to configure a job and store any related job metadata to ensure 
@@ -96,7 +94,7 @@ def write_file_meta(project, file_id, size, needs_sharding):
     command = """
         INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
         """
-    psql_cursor.execute(command % (project, file_id, size, needs_sharding))
+    dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
     logging.debug("Wrote meta for file: %s" % file_id)    
 
 #
@@ -121,28 +119,26 @@ def process_large_file(project, path, chunk_size):
 #
 def scan_task(project: str):
 
-    pool = Pool(processes=8)    
+    futures = []    
 
     try:
 
         meta_command = """
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
-        psql_cursor.execute(meta_command % project)
-        metadata = psql_cursor.fetchone()
-        
+        metadata = dbmgr.exe_fetch_one(meta_command % project)
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
                 UPDATE ptolemy_projects SET status = 'executing scan' WHERE project = \'%s\';
                 """
-            psql_cursor.execute(status_command % project)
+            dbmgr.execute_command.execute(status_command % project)
             chunk_size = 1024 * 1024 * 1024 * metadata[0]
             table_command = """
                 CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
                 """
-            psql_cursor.execute(table_command % project)
-            psql_conn.commit()
+            dbmgr.execute_command.execute(table_command % project)
+            dbmgr.db_bulk_commit()
             
             # scan the filesystem and capture the metadata
             # very straight forward, logic will dictate if a file exceeds chunk/shard size
@@ -153,22 +149,19 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        meta_result = pool.apply_async(write_file_meta, args=(project, file_path, 0, 't'))      
-                        meta_result.get()
-                        large_result = pool.apply_async(process_large_file, args=(project, file_path, chunk_size))
-                        large_result.get()
+                        futures.append(executor.submit(write_file_meta, args=(project, file_path, 0, 't')))
+                        #meta_result = pool.apply_async(write_file_meta, args=(project, file_path, 0, 't'))      
+                        #meta_result.get()
+                        #large_result = pool.apply_async(process_large_file, args=(project, file_path, chunk_size))
+                        #large_result.get()
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        meta_result = pool.apply_async(write_file_meta, args=(project, file_path, file_size, 'f'))
-                        meta_result.get()
+                        #meta_result = pool.apply_async(write_file_meta, args=(project, file_path, file_size, 'f'))
+                        #meta_result.get()
                         logging.debug("Adding small file: %s" % file_path)
             
-            logging.debug("Calling pool.close()")
-            pool.close()
-            logging.debug("Calling pool.join()")
-            pool.join()
 
-            psql_cursor.commit()
+            dbmgr.db_bulk_commit()
 
             #dbmgr.db_bulk_commit()
             #dbmgr.cursor_close()
