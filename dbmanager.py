@@ -80,39 +80,7 @@ class DbManager:
             self.cursor.close()
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)     
-            
-    #
-    # Method used to maintain all project related metadata.
-    #
-    def buildProjectTable(self):
-        
-        command = """
-            CREATE TABLE ptolemy_projects (project TEXT PRIMARY KEY, shard_size INT, car_size INT, encryption TEXT, staging_dir TEXT, target_dir TEXT, load_type TEXT);
-            """
-        try:
-            self.cursor.execute(command)
-            self.conn.commit()
-            logging.debug("Created table ptolemy_projects for storage of project metadata.")
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)        
-
-    #
-    # Stores a project instance with high-level metadata to help job execution.
-    #
-    def insertProject(self, project, shard_size, car_size, encryption, staging_dir, target_dir, load_type):
-
-        command = """
-        INSERT INTO ptolemy_projects (project, shard_size, car_size, encryption, staging_dir, target_dir, load_type) VALUES (\'%s\', %i, %i, \'%s\', \'%s\', \'%s\', \'%s\');
-        """
-        
-        try:
-            self.cursor.execute(command % (project, shard_size, car_size, encryption, staging_dir, target_dir, load_type))
-            self.conn.commit()
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)            
-            
+                        
     #
     # Method used by the fsmanager to create a table for each project as a job is launched.
     #
@@ -128,69 +96,6 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
             logging.error(error)
-
-    #
-    # Method used by Ptolemy to keep track of the workers.
-    #
-    def buildWorkerTable(self):
-        
-        command = """
-            CREATE TABLE ptolemy_workers (ip_addr TEXT PRIMARY KEY, port TEXT, active BOOLEAN);
-            """
-        try:
-            self.cursor.execute(command)
-            self.conn.commit()
-            logging.debug("Creating worker table for Ptolemy orchestrator.")
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)
-            
-    #
-    # Add a worker to the database for maintenance
-    #
-    def addWorker(self, ip_addr, port):
-        
-        command = """
-        INSERT INTO ptolemy_workers (ip_addr, port, active) VALUES (\'%s\', \'%s\', 't');
-        """
-        try:
-            self.cursor.execute(command % (ip_addr, port))
-            self.conn.commit()
-            logging.debug("Adding worker with IP Address of: %s" % ip_addr)
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)
-
-    #
-    # Fail worker
-    #
-    def failWorker(self, ip_addr, port):
-        
-        command = """
-        UPDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
-        """
-        try:
-            self.cursor.execute(command % (ip_addr, port))
-            self.conn.commit()            
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)    
-            
-    #
-    # If a worker was marked down and wishes to register we ensure we can
-    # make him active again.
-    #
-    def activateWorker(self, ip_addr, port):
-        
-        command = """
-        UPDATE ptolemy_workers SET active = 't' WHERE ip_addr = '%s' AND port = '%s';
-        """
-        try:
-            self.cursor.execute(command % (ip_addr, port))
-            self.conn.commit()            
-        except(Exception, psycopg2.DatabaseError) as error:
-            self.conn.rollback()
-            logging.error(error)    
             
     #
     # Method used to get the type of project we are running.  If it is serial
@@ -224,37 +129,7 @@ class DbManager:
             return result
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)        
-    
-    #
-    # Check to see if worker has already been registered
-    #
-    def workerCheck(self, ip_addr, port):
-        
-        command = """
-        SELECT COUNT(1) FROM ptolemy_workers WHERE ip_addr = '%s' AND port = '%s';
-        """
-        try:
-            self.cursor.execute(command % (ip_addr, port))
-            result = self.cursor.fetchone()
-            return result
-        except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error)        
-
-    #
-    # Method used to get the list of workers that are active.
-    #
-    def getWorkerList(self):
-        
-        command = """
-        SELECT * FROM ptolemy_workers WHERE active = 't';
-        """
-        try:
-            self.cursor.execute(command)
-            result = self.cursor.fetchall()
-            return result
-        except(Exception, psycopg2.DatabaseError) as error:
-            logging.debug(error)
-        
+            
     #
     # Method used by fsmanager to add a file's metadata to a specific project table.
     #
@@ -270,44 +145,10 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
             
-
-    #
-    # Gracefully close our database connection
-    #
-    def closeDbConn(self):
-
-        if self.conn is not None:
-            self.conn.close()
-
-    #
-    # Check to see if a specific table exists.
-    #
-    def tableCheck(self, db, table):
-
-        command = """
-            SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_catalog='%s' AND table_schema='public' AND table_name='%s');
-            """
-        try:
-            self.cursor.execute(command % (db, table))
-            result = self.cursor.fetchone()
-            return result[0];
-        except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error)
-
     #
     # Method used to commit a series of transactions in bulk
     #
     def db_bulk_commit(self):
-
-        try:
-            self.conn.commit()
-        except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error)
-
-    #
-    # Method used to commit a series of transactions in bulk
-    #
-    def dbBulkCommit(self):
 
         try:
             self.conn.commit()
@@ -476,3 +317,9 @@ class DbManager:
 
         if self.conn is not None:
             self.conn.close()    
+
+    #
+    #
+    #
+    def close_cursor(self):
+        self.cursor.close()

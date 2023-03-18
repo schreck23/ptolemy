@@ -17,6 +17,7 @@ import fsscanner
 import subprocess
 import random
 import string
+import threading
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
@@ -29,7 +30,7 @@ logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/
 app = FastAPI()
 app = fastapi.FastAPI()
 
-pool = Pool(processes=8)
+pool = Pool(processes=128)
 
 #
 # Used to configure a job and store any related job metadata to ensure 
@@ -202,9 +203,13 @@ def containerize_structure(project: str):
     try:
         dbmgr = dbmanager.DbManager()
         
+        table_command = """
+        
+            """
+        
         # get our shard sizing, planned unit is GiB 
         chunk_command = """
-            SELECT shard_size FROM ptolemy_projects WHERE project = \'%s\';
+            SELECT car_size FROM ptolemy_projects WHERE project = \'%s\';
             """
         size = dbmgr.exe_fetch_one(chunk_command % project) * 1024 * 1024 * 1024
         
@@ -245,6 +250,8 @@ def containerize_structure(project: str):
             matrix = dbmgr.exe_fetch_many(fetch_command % project, 300000)
 
         pool.apply_async(add_container, args=(dbmgr, project, car_name))
+        pool.close()
+        pool.join()
         dbmgr.db_bulk_commit()        
         
     except(Exception) as error:
@@ -327,3 +334,6 @@ def worker_heartbeat(worker: Worker):
             dbmgr.closeDbConn()        
         time.sleep(15)
         
+#
+#
+#
