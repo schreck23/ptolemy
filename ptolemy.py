@@ -41,12 +41,6 @@ if __name__ == "__main__":
     #
     psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
     psql_cursor = psql_conn.cursor()
-
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=8000,
-    )    
     
 #
 # Used to configure a job and store any related job metadata to ensure 
