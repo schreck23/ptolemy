@@ -149,11 +149,12 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        futures.append(executor.submit(write_file_meta, args=(project, file_path, 0, 't')))
-                        futures.append(executor.submit(process_large_file, args=(project, file_path, chunk_size)))
+                        #futures.append(executor.submit(write_file_meta, args=(project, file_path, 0, 't')))
+                        futures.append(executor.submit(write_file_meta, project, file_path, 0, 't'))
+                        futures.append(executor.submit(process_large_file, project, file_path, chunk_size))
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        futures.append(executor.submit(write_file_meta, rgs=(project, file_path, file_size, 'f')))
+                        futures.append(executor.submit(write_file_meta, project, file_path, file_size, 'f'))
                         logging.debug("Adding small file: %s" % file_path)
 
             for future in futures:
