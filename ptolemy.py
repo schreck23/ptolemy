@@ -18,6 +18,7 @@ import subprocess
 import random
 import string
 import threading
+import psycopg2
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
@@ -27,10 +28,22 @@ from multiprocessing import Pool
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
+#
+# FastAPI for our HTTP routes
+#
 app = FastAPI()
 app = fastapi.FastAPI()
 
-pool = Pool(processes=128)
+#
+# Pool to manage our process pool and manage transactions
+#
+pool = Pool(processes=8)
+
+#
+# Setup our connection to the postgres database.
+#
+psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+psql_cursor = psql_conn.cursor()
 
 #
 # Used to configure a job and store any related job metadata to ensure 
@@ -72,18 +85,18 @@ async def define_project(project: str, metadata: Project):
 # Template method used to write each file or file shard's metadata to the database
 # for retention.
 #
-def write_file_meta(dbmgr, project, file_id, size, needs_sharding):
+def write_file_meta(project, file_id, size, needs_sharding):
     command = """
         INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
         """
-    dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
+    psql_cursor.execute(command % (project, file_id, size, needs_sharding))
     logging.debug("Wrote meta for file: %s" % file_id)
 
 #
 # Useed by the scan method this will determine the appropriate splits for any files
 # that exceed the threshold for the project as described in the database.
 #
-def process_large_file(dbmgr, project, path, chunk_size):
+def process_large_file(project, path, chunk_size):
 
     with open(path, 'rb') as infile:
         index = 0
@@ -93,7 +106,7 @@ def process_large_file(dbmgr, project, path, chunk_size):
                 break
                 chunk_path = path + ".ptolemy" + str(index)
                 file_size = len(chunk)
-                write_file_meta(dbmgr, project, chunk_path, file_size, 'f')
+                write_file_meta(project, chunk_path, file_size, 'f')
                 index += 1        
 
 #
@@ -115,24 +128,25 @@ def scan_task(project: str):
     global pool
     
     try:
-        dbmgr = dbmanager.DbManager()
+
         meta_command = """
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
-        metadata = dbmgr.exe_fetch_one(meta_command % project)
-    
+        psql_cursor.execute(meta_command % project)
+        metadata = psql_cursor.fetchone()
+        
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
                 UPDATE ptolemy_projects SET status = 'executing scan' WHERE project = \'%s\';
                 """
-            dbmgr.execute_command(status_command % project)
+            psql_cursor.execute(status_command % project)
             chunk_size = 1024 * 1024 * 1024 * metadata[0]
             table_command = """
                 CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
                 """
-            dbmgr.execute_command(table_command % project)
-            dbmgr.db_bulk_commit()
+            psql_cursor.execute(table_command % project)
+            psql_conn.commit()
             
             # scan the filesystem and capture the metadata
             # very straight forward, logic will dictate if a file exceeds chunk/shard size
@@ -143,13 +157,13 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        meta_result = pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, 0, 't'))      
+                        meta_result = pool.apply_async(write_file_meta, args=(project, file_path, 0, 't'))      
                         meta_result.get()
-                        large_result = pool.apply_async(process_large_file, args=(dbmgr, project, file_path, chunk_size))
+                        large_result = pool.apply_async(process_large_file, args=(project, file_path, chunk_size))
                         large_result.get()
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        meta_result.pool.apply_async(write_file_meta, args=(dbmgr, project, file_path, file_size, 'f'))
+                        meta_result = pool.apply_async(write_file_meta, args=(project, file_path, file_size, 'f'))
                         meta_result.get()
                         logging.debug("Adding small file: %s" % file_path)
             
@@ -158,9 +172,9 @@ def scan_task(project: str):
             logging.debug("Calling pool.join()")
             pool.join()
 
-            dbmgr.db_bulk_commit()
-            dbmgr.cursor_close()
-            dbmgr.close_db_conn()
+            #dbmgr.db_bulk_commit()
+            #dbmgr.cursor_close()
+            #dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
         
