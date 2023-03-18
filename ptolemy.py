@@ -82,6 +82,17 @@ async def define_project(project: str, metadata: Project):
         raise HTTPException(status_code=500, detail=str(error))            
 
 #
+# This method will invoke the full scan of a project's target directory.  Upon 
+# completion (which can be timely based on structure size) the metadata of all
+# the files contained within the structure are written to the database.  This will
+# also calculate the file splits along boundaries to help with containerization.
+#
+@app.post("/v0/scan/{project}")
+async def project_scan(project: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(scan_task, project)
+    return {"message": "Connecting to database and starting filesystem scan."}
+
+#
 # Template method used to write each file or file shard's metadata to the database
 # for retention.
 #
@@ -108,17 +119,6 @@ def process_large_file(project, path, chunk_size):
                 file_size = len(chunk)
                 write_file_meta(project, chunk_path, file_size, 'f')
                 index += 1        
-
-#
-# This method will invoke the full scan of a project's target directory.  Upon 
-# completion (which can be timely based on structure size) the metadata of all
-# the files contained within the structure are written to the database.  This will
-# also calculate the file splits along boundaries to help with containerization.
-#
-@app.post("/v0/scan/{project}")
-async def project_scan(project: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(scan_task, project)
-    return {"message": "Connecting to database and starting filesystem scan."}
 
 #
 # The scan method used by our route above.
