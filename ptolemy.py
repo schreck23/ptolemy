@@ -29,21 +29,16 @@ from multiprocessing import Pool
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 #
+# Database settings we wish to leverage
+#
+psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+psql_cursor = psql_conn.cursor()
+
+#
 # FastAPI for our HTTP routes
 #
 app = FastAPI()
 app = fastapi.FastAPI()
-
-#
-# Pool to manage our process pool and manage transactions
-#
-pool = Pool(processes=8)
-
-#
-# Setup our connection to the postgres database.
-#
-psql_conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
-psql_cursor = psql_conn.cursor()
 
 #
 # Used to configure a job and store any related job metadata to ensure 
