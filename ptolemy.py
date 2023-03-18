@@ -120,6 +120,9 @@ def process_large_file(project, path, chunk_size):
 #
 def scan_task(project: str):
 
+    #
+    # Helper method for redundancy and multiproessing
+    #
     def write_file_meta(project, file_id, size, needs_sharding):
         command = """
             INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
@@ -127,8 +130,8 @@ def scan_task(project: str):
         psql_cursor.execute(command % (project, file_id, size, needs_sharding))
         logging.debug("Wrote meta for file: %s" % file_id)    
 
-    global pool
-    
+    pool = Pool(processes=8)    
+
     try:
 
         meta_command = """
@@ -217,8 +220,6 @@ def set_container(dbmgr, project, file, car_name):
 @app.post("/v0/containerize/{project}")
 def containerize_structure(project: str):
     
-    global pool
-    
     try:
         dbmgr = dbmanager.DbManager()
         
@@ -258,9 +259,9 @@ def containerize_structure(project: str):
                     if ((processed + int(iter[1])) < size):
                         processed += int(iter[1])
                         car_cache.append(iter[0])
-                        pool.apply_async(set_container, args=(dbmgr, project, iter[0], car_name))      
+                        #pool.apply_async(set_container, args=(dbmgr, project, iter[0], car_name))      
                     else:
-                        pool.apply_async(add_container, args=(dbmgr, project, car_name))
+                        #pool.apply_async(add_container, args=(dbmgr, project, car_name))
                         car_name = generate_car_name()
                         car_cache = []
                         processed = 0
@@ -268,9 +269,9 @@ def containerize_structure(project: str):
             # processed first 300K, check and see if there are any more to process
             matrix = dbmgr.exe_fetch_many(fetch_command % project, 300000)
 
-        pool.apply_async(add_container, args=(dbmgr, project, car_name))
-        pool.close()
-        pool.join()
+        #pool.apply_async(add_container, args=(dbmgr, project, car_name))
+        #pool.close()
+        #pool.join()
         dbmgr.db_bulk_commit()        
         
     except(Exception) as error:
