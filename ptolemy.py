@@ -91,6 +91,7 @@ async def project_scan(project: str, background_tasks: BackgroundTasks):
 # Helper method for redundancy and multiproessing
 #
 def write_file_meta(project, file_id, size, needs_sharding):
+    print("In write_file_meta method.")
     command = """
         INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
         """
