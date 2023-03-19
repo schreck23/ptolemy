@@ -116,6 +116,7 @@ def process_large_file(project, path, chunk_size):
     chunk_path = path + ".ptolemy" + str(full_shards)
     print(chunk_path)
     write_file_meta(project, chunk_path, remainder, 'f')
+    
 #    with open(path, 'rb') as infile:
 #        index = 0
 #        while True:
