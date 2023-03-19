@@ -181,6 +181,7 @@ def scan_task(project: str):
                     #
                     if(counter == 250000):
                         dbmgr.db_bulk_commit()
+                        counter = 0
                     else:
                         counter += 1
                     
