@@ -17,6 +17,7 @@ import random
 import string
 import math
 
+from multiprocessing import Pool
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -83,11 +84,14 @@ async def project_scan(project: str, background_tasks: BackgroundTasks):
 # Helper method for redundancy and multiproessing
 #
 def write_file_meta(project, file_id, size, shard_index, needs_sharding):
+    dbmgr = dbmanager.DbManager()
     command = """
         INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', %i, \'%s\');
         """
     dbmgr.execute_command(command % (project, file_id, size, shard_index, needs_sharding))
+    dbmgr.db_bulk_commit()
     logging.debug("Wrote meta for file: %s" % file_id)    
+    dbmgr.close_db_conn()
 
 #
 # Useed by the scan method this will determine the appropriate splits for any files
@@ -110,6 +114,8 @@ def process_large_file(project, path, chunk_size):
 # The scan method used by our route above.
 #
 def scan_task(project: str):
+
+    pool = Pool(processes=16)    
 
     try:
 
@@ -139,14 +145,16 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        write_file_meta(project, file_path, 0, 0, 't')
-                        process_large_file(project, file_path, chunk_size)
+                        pool.apply(write_file_meta, args=(project, file_path, 0, 0, 't'))
+                        pool.apply(process_large_file, args=(project, file_path, chunk_size))
+                        #write_file_meta(project, file_path, 0, 0, 't')
+                        #process_large_file(project, file_path, chunk_size)
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        write_file_meta(project, file_path, file_size, 0, 'f')
+                        pool.apply(write_file_meta, args=(project, file_path, file_size, 0, 'f'))
+                        #write_file_meta(project, file_path, file_size, 0, 'f')
                         logging.debug("Adding small file: %s" % file_path)
 
-            dbmgr.db_bulk_commit()
             dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
