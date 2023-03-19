@@ -19,6 +19,7 @@ import random
 import string
 import threading
 import psycopg2
+import math
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
@@ -104,16 +105,23 @@ def write_file_meta(project, file_id, size, needs_sharding):
 #
 def process_large_file(project, path, chunk_size):
 
-    with open(path, 'rb') as infile:
-        index = 0
-        while True:
-            chunk = infile.read(chunk_size)
-            if not chunk:
-                break
-                chunk_path = path + ".ptolemy" + str(index)
-                file_size = len(chunk)
-                write_file_meta(project, chunk_path, file_size, 'f')
-                index += 1        
+    file_size = os.path.getsize(path)
+    full_shards = math.floor(file_size / (1024 * 1024 * 1024 * chunk_size))
+    remainder = file_size - (full_shards * 1024 * 1024 * 1024 * chunk_size)     
+
+    for i in range(0, full_shards):
+        chunk_path = path + ".ptolemy" + str(i)
+        print(chunk_path)
+#    with open(path, 'rb') as infile:
+#        index = 0
+#        while True:
+#            chunk = infile.read(chunk_size)
+#            if not chunk:
+#                break
+#                chunk_path = path + ".ptolemy" + str(index)
+#                file_size = len(chunk)
+#                write_file_meta(project, chunk_path, file_size, 'f')
+#                index += 1        
 
 #
 # The scan method used by our route above.
@@ -150,20 +158,15 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        #futures.append(executor.submit(write_file_meta, args=(project, file_path, 0, 't')))
                         write_file_meta(project, file_path, 0, 't')
-                        futures.append(executor.submit(process_large_file, project, file_path, chunk_size))
+                        process_large_file(project, file_path, chunk_size)
                         logging.debug("Adding large file: %s" % file_path)
                     else:
                         write_file_meta(project, file_path, file_size, 'f')
                         logging.debug("Adding small file: %s" % file_path)
 
             dbmgr.db_bulk_commit()
-            
-            for future in futures:
-                future.result()
-            dbmgr.db_bulk_commit()
-            
+                        
             #dbmgr.db_bulk_commit()
             #dbmgr.cursor_close()
             #dbmgr.close_db_conn()
