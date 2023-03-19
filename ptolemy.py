@@ -109,9 +109,13 @@ def process_large_file(project, path, chunk_size):
     full_shards = math.floor(file_size / (1024 * 1024 * 1024 * chunk_size))
     remainder = file_size - (full_shards * 1024 * 1024 * 1024 * chunk_size)     
 
-    for i in range(0, full_shards):
+    for i in range(0, full_shards + 1):
         chunk_path = path + ".ptolemy" + str(i)
+        write_file_meta(project, chunk_path, (1024 * 1024 * 1024 * chunk_size), 'f')
         print(chunk_path)
+    chunk_path = path + ".ptolemy" + str(full_shards)
+    print(chunk_path)
+    write_file_meta(project, chunk_path, remainder, 'f')
 #    with open(path, 'rb') as infile:
 #        index = 0
 #        while True:
