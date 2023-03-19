@@ -165,7 +165,7 @@ def scan_task(project: str):
                             dbmgr.execute_command(file_command % (project, chunk_path, chunk_size, i, 'f'))
                         # write the remainder chunk
                         chunk_path = file_path + ".ptolemy" + str(full_shards)
-                        dbmgr.execute_command(project, chunk_path, remainder, full_shards, 'f')
+                        dbmgr.execute_command(file_command % (project, chunk_path, remainder, full_shards, 'f'))
                         
                         #write_file_meta(project, file_path, 0, 0, 't')
                         #process_large_file(project, file_path, chunk_size)
