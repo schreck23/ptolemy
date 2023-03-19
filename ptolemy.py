@@ -115,7 +115,8 @@ def process_large_file(project, path, chunk_size):
 #
 def scan_task(project: str):
 
-    pool = Pool(processes=16)    
+    counter = 0    
+    dbmgr = dbmanager.DbManager()
 
     try:
 
@@ -123,6 +124,11 @@ def scan_task(project: str):
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
         metadata = dbmgr.exe_fetch_one(meta_command % project)
+        
+        file_command = """
+            INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', %i, \'%s\');
+            """
+        
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
             status_command = """
@@ -144,17 +150,41 @@ def scan_task(project: str):
                     file_path = os.path.join(root, file)
                     file_size = os.path.getsize(file_path)
 
+                    # If we have a file to split, add the base meta and calculate the shards, else just write the meta for the small file.
                     if(file_size > chunk_size):
-                        pool.apply(write_file_meta, args=(project, file_path, 0, 0, 't'))
-                        pool.apply(process_large_file, args=(project, file_path, chunk_size))
+                        logging.debug("Writing large file metadata for %s to database." % file_path)
+                        dbmgr.execute_command(file_command % (project, file_path, 0, 0, 't'))
+
+                        
+                        #pool.apply(process_large_file, args=(project, file_path, chunk_size))
+                        
+                        full_shards = math.floor(file_size / chunk_size)
+                        remainder = file_size - (full_shards * chunk_size)
+                        for i in range(0, int(full_shards)):
+                            chunk_path = file_path + ".ptolemy" + str(i)
+                            dbmgr.execute_command(file_command % (project, chunk_path, chunk_size, i, 'f'))
+                        # write the remainder chunk
+                        chunk_path = file_path + ".ptolemy" + str(full_shards)
+                        dbmgr.execute_command(project, chunk_path, remainder, full_shards, 'f')
+                        
                         #write_file_meta(project, file_path, 0, 0, 't')
                         #process_large_file(project, file_path, chunk_size)
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        pool.apply(write_file_meta, args=(project, file_path, file_size, 0, 'f'))
+                        dbmgr.execute_command(file_command % (project, file_path, file_size, 0, 'f'))
+                        #pool.apply(write_file_meta, args=(project, file_path, file_size, 0, 'f'))
                         #write_file_meta(project, file_path, file_size, 0, 'f')
                         logging.debug("Adding small file: %s" % file_path)
-
+                    
+                    #
+                    # We could have a lot to process ... commit every 250K
+                    #
+                    if(counter == 250000):
+                        dbmgr.db_bulk_commit()
+                    else:
+                        counter += 1
+                    
+            dbmgr.db_bulk_commit()
             dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
