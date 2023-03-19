@@ -13,21 +13,14 @@ import dbmanager
 import time
 import os
 import requests
-import fsscanner
-import subprocess
 import random
 import string
-import threading
-import psycopg2
 import math
 
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
-from multiprocessing import Pool
-
-from concurrent.futures.thread import ThreadPoolExecutor
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
@@ -36,8 +29,6 @@ logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/
 #
 app = FastAPI()
 app = fastapi.FastAPI()
-
-executor = ThreadPoolExecutor(8)
 
 dbmgr = dbmanager.DbManager()
     
@@ -91,11 +82,11 @@ async def project_scan(project: str, background_tasks: BackgroundTasks):
 #
 # Helper method for redundancy and multiproessing
 #
-def write_file_meta(project, file_id, size, needs_sharding):
+def write_file_meta(project, file_id, size, shard_index, needs_sharding):
     command = """
-        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', 0, \'%s\');
+        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', %i, \'%s\');
         """
-    dbmgr.execute_command(command % (project, file_id, size, needs_sharding))
+    dbmgr.execute_command(command % (project, file_id, size, shard_index, needs_sharding))
     logging.debug("Wrote meta for file: %s" % file_id)    
 
 #
@@ -105,34 +96,20 @@ def write_file_meta(project, file_id, size, needs_sharding):
 def process_large_file(project, path, chunk_size):
 
     file_size = os.path.getsize(path)
-    full_shards = math.floor(file_size / (1024 * 1024 * 1024 * chunk_size))
-    remainder = file_size - (full_shards * 1024 * 1024 * 1024 * chunk_size)     
+    full_shards = math.floor(file_size / chunk_size)
+    remainder = file_size - (full_shards * chunk_size)     
 
-    for i in range(0, full_shards + 1):
+    for i in range(0, int(full_shards)):
         chunk_path = path + ".ptolemy" + str(i)
-        write_file_meta(project, chunk_path, (1024 * 1024 * 1024 * chunk_size), 'f')
-        print(chunk_path)
+        write_file_meta(project, chunk_path, chunk_size, i, 'f')
+        
     chunk_path = path + ".ptolemy" + str(full_shards)
-    print(chunk_path)
-    write_file_meta(project, chunk_path, remainder, 'f')
+    write_file_meta(project, chunk_path, remainder, full_shards, 'f')
     
-#    with open(path, 'rb') as infile:
-#        index = 0
-#        while True:
-#            chunk = infile.read(chunk_size)
-#            if not chunk:
-#                break
-#                chunk_path = path + ".ptolemy" + str(index)
-#                file_size = len(chunk)
-#                write_file_meta(project, chunk_path, file_size, 'f')
-#                index += 1        
-
 #
 # The scan method used by our route above.
 #
 def scan_task(project: str):
-
-    futures = []    
 
     try:
 
@@ -162,18 +139,15 @@ def scan_task(project: str):
                     file_size = os.path.getsize(file_path)
 
                     if(file_size > chunk_size):
-                        write_file_meta(project, file_path, 0, 't')
+                        write_file_meta(project, file_path, 0, 0, 't')
                         process_large_file(project, file_path, chunk_size)
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        write_file_meta(project, file_path, file_size, 'f')
+                        write_file_meta(project, file_path, file_size, 0, 'f')
                         logging.debug("Adding small file: %s" % file_path)
 
             dbmgr.db_bulk_commit()
-                        
-            #dbmgr.db_bulk_commit()
-            #dbmgr.cursor_close()
-            #dbmgr.close_db_conn()
+            dbmgr.close_db_conn()
         else:
             raise HTTPException(status_code=404, detail="Requested project not found in the database.")
         
@@ -348,6 +322,3 @@ def worker_heartbeat(worker: Worker):
             dbmgr.closeDbConn()        
         time.sleep(15)
         
-#
-#
-#
