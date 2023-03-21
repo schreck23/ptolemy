@@ -18,35 +18,28 @@ import shutil
 from multiprocessing import Pool
 
 from pydantic import BaseModel
+from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
+
+import psycopg2
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
 
-connected = False
-
 config = configparser.ConfigParser()
 config.read('worker.ini')
 
-pool = Pool(processes=int(config.get('worker', 'threads')))
+connected = False
 
-if __name__ == "__main__":
-    
+def register():
+
+    global connected
     workip = config.get('worker', 'ip_addr')
     workport = config.get('worker', 'port')
-    
-    uvicorn.run(
-        app,
-        host=workip,
-        port=int(workport),
-    )
-    
     orchip = config.get('orchestrator', 'ip_addr')
-    orchport = config.get('orchestrator', 'port')
-    
-    global connected
-    
+    orchport = config.get('orchestrator', 'port')    
+
     while(not connected):
         try:
             url = "http://" + orchip + ":" + orchport + "/v0/worker/"
@@ -56,7 +49,7 @@ if __name__ == "__main__":
             }
             
             response = requests.post(url, json=worker_data)
-        
+            logging.debug(response)
             # Check the response status code
             if response.status_code == 200:
                 logging.debug("Worker registered successfully!")
@@ -67,8 +60,11 @@ if __name__ == "__main__":
         except(Exception) as error:
             logging.error(error)       
             logging.error("Unable to connect to orchestrator, will try again in 60 seconds.")
-            time.sleep(30)
-            
+            time.sleep(30)        
+
+# Register the worker with Ptolemy
+register()
+
 #
 # Basic reply to heartbeat request from orchestrator to ensure our endpoint
 # is still functional.
@@ -100,6 +96,9 @@ class TheHighway:
     def is_empty(self):
         return len(self.highway) == 0
     
+    def reset_queue(self):
+        self.highway = []
+    
 #
 # Manages our car queue for processing. 
 #
@@ -122,3 +121,108 @@ async def add_car_to_queue(project: str, car: CarFile):
     logging.debug("Adding car named %s to the highway." % car)
     
 
+#
+#
+#
+def split_file(file_id, piece_size, staging_dir):
+    
+    with open(file_id, 'rb') as infile:
+        index = 0
+        while True:
+            chunk = infile.read(piece_size)
+            if not chunk:
+                break
+            chunk_path = file_id + ".ptolemy" + str(index)
+            target = os.path.join(staging_dir, chunk_path[1:])
+            temp_stor = os.path.split(target)
+            logging.debug("Making directory: %s" % temp_stor[0])
+            os.makedirs(temp_stor[0], exist_ok=True)
+            with open(target, 'wb') as outfile:
+                outfile.write(chunk)
+                outfile.close()
+            index += 1
+    infile.close()    
+
+#
+#
+#
+def process_car(cariter, project):
+        
+    # Command to get the list of car files we are building
+    list_command = """
+        SELECT file_id, size FROM %s WHERE carfile = \'%s\' ;
+        """
+    project_command = """
+        SELECT staging_dir, shard_size FROM ptolemy_projects WHERE project = \'%s\';
+        """
+
+    conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+    cursor = conn.cursor()    
+
+    cursor.execute(project_command % project)
+    project_meta = cursor.fetchone()
+    
+    cursor.execute(list_command % (project, cariter.car_name))
+    file_list = cursor.fetchall()
+    
+    os.makedirs(os.path.join(project_meta[0], cariter.car_name), exist_ok=True)
+    logging.debug("Running car build for artifact: %s" % cariter.car_name)
+    
+    piece_size = 1024 * 1024 * 1024 * project_meta[1]
+    
+    # Iterate through each file and place it in the car staging area,
+    # if a file shard is requested we must split the file as well.
+    for file_iter in file_list:
+        if('.ptolemy' in file_iter[0]):
+            # We check to see if the shard exists in staging then move it, otherwise
+            # we shard the main file and then move the shard we are targeting.
+            temp = os.path.join(project_meta[0], file_iter[0][1:])
+            if(os.path.isfile(temp)):
+                logging.debug("Found shard %s and placing in car directory." % file_iter[0])
+                root = os.path.split(file_iter[0])
+                car_stage = os.path.join(project_meta[0], cariter.car_name)
+                landing_spot = os.path.join(car_stage, root[0][1:])
+                os.makedirs(landing_spot, exist_ok=True)
+                shutil.move(temp, landing_spot)                
+                logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
+            else:
+                pathing = file_iter[0].split('.ptolemy')
+                split_file(pathing[0], piece_size, project_meta[0])
+                root = os.path.split(file_iter[0])
+                car_stage = os.path.join(project_meta[0], cariter.car_name)
+                landing_spot = os.path.join(car_stage, root[0][1:])
+                os.makedirs(landing_spot, exist_ok=True)
+                shutil.move(temp, landing_spot)                
+                logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))                
+        else:
+            root = os.path.split(file_iter[0])
+            car_stage = os.path.join(project_meta[0], cariter.car_name)
+            landing_spot = os.path.join(car_stage, root[0][1:])
+            os.makedirs(landing_spot, exist_ok=True)
+            shutil.copy(file_iter[0], landing_spot)
+            logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
+    
+    logging.debug("Finished build car file %s and placing it in our staging area." % cariter.car_name)
+    conn.close()
+#
+#
+#
+@app.post("/v0/blitz/{project}")
+async def blitz_build(project: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(blitz, project)
+    return {"Message" : "Worker performing blitz build in background."}
+
+#
+# Run the blitz
+#
+def blitz(project: str):
+    global the_highway
+    pool = Pool(processes=8)
+    
+    for iter in the_highway.highway:
+        if(project == iter[0]):
+            pool.apply_async(process_car, args=(iter[1], project))     
+
+    pool.close()
+    pool.join()
+    
