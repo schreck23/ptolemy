@@ -155,6 +155,9 @@ def process_car(cariter, project):
     project_command = """
         SELECT staging_dir, shard_size FROM ptolemy_projects WHERE project = \'%s\';
         """
+    update_command = """
+        UPDATE ptolemy_cars SET processed = 't' WHERE car_id = \'%s\';
+        """
 
     conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
     cursor = conn.cursor()    
@@ -201,9 +204,10 @@ def process_car(cariter, project):
             os.makedirs(landing_spot, exist_ok=True)
             shutil.copy(file_iter[0], landing_spot)
             logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
-    
+    cursor.execute(update_command % cariter.car_name)
     logging.debug("Finished build car file %s and placing it in our staging area." % cariter.car_name)
     conn.close()
+    
 #
 #
 #
@@ -225,4 +229,3 @@ def blitz(project: str):
 
     pool.close()
     pool.join()
-    
