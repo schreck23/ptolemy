@@ -228,6 +228,7 @@ def containerize_structure(project: str):
         counter = 0
         logging.debug("Max size is: %i" % size)
         while (len(matrix) > 0):
+            logging.debug("Top of while loop.")
             for iter in matrix:
                 counter += 1
                 if(int(iter[1]) > 0):
@@ -250,6 +251,7 @@ def containerize_structure(project: str):
             # processed first 250K, check and see if there are any more to process
             logging.debug("Grabbing another 250K.")
             matrix = dbmgr.exe_fetch_many(fetch_command % project, 250000)
+            logging.debug("Pulled %i entries from the database." % len(matrix))
         logging.debug("Handling last car file.")
         dbmgr.execute_command(add_command % (car_name, project))
 
