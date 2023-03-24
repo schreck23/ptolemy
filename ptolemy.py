@@ -236,7 +236,7 @@ def containerize_structure(project: str):
                         car_cache.append(iter[0])
                         logging.debug(update_command % (project, car_name, iter[0]))
                         dbmgr.execute_command(update_command % (project, car_name, iter[0]))
- 
+                        logging.debug("Size is: %i" % processed)
                     else:
                         logging.debug(add_command % (car_name, project))
                         dbmgr.execute_command(add_command % (car_name, project))
