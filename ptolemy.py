@@ -226,7 +226,7 @@ def containerize_structure(project: str):
         matrix = dbmgr.exe_fetch_many(fetch_command % project, 250000)
         
         counter = 0
-        
+        logging.debug("Max size is: %i" % size)
         while (len(matrix) > 0):
             for iter in matrix:
                 counter += 1
