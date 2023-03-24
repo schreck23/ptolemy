@@ -248,16 +248,16 @@ def containerize_structure(project: str):
                     dbmgr.db_bulk_commit()
                     counter = 0
             # processed first 250K, check and see if there are any more to process
+            logging.debug("Grabbing another 250K.")
             matrix = dbmgr.exe_fetch_many(fetch_command % project, 250000)
-
-        
+        logging.debug("Handling last car file.")
         dbmgr.execute_command(add_command % (car_name, project))
 
         status_close = """
             UPDATE ptolemy_projects SET status = 'completed containerization' WHERE project = \'%s\';
             """
         dbmgr.execute_command(status_close % project)
-
+        logging.debug("Performing final commit.")
         dbmgr.db_bulk_commit()        
         dbmgr.close_db_conn()
         return {"message": "Containerization of filesystem is complete."}
