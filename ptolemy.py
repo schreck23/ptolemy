@@ -401,7 +401,20 @@ def prime_workers(project):
 async def process_blitz(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(prime_workers, project)
     return {"message" : "Beginning blitz build for worker."}
+
+#
+#
+#
+@app.get("/v0/carfile_meta/{project}")
+async def get_carfile_meta(project: str):
+    dbmgr = dbmanager.DbManager()
     
+    try:
+        query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\';"
+        results = dbmgr.exe_fetch_all(query_command % project)
+        return results
+    except(Exception) as error:
+        logging.debug(error)
 #
 # Run a serial build of all the car files in our database for this project.
 #
