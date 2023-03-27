@@ -100,4 +100,13 @@ uvicorn worker:app --port <port to use (default 8000)> --host <machine IP>
 The worker when launched will automatically connect to the orchestrator and 
 begin responding to heartbeats for worker fault detection.
 
+Special Notes:
+
+Ptolemy uses the equivalence of apparent-disk usage when calculating file size
+this can actually cause sizing discrepancies in rare circumstances.  For 
+example on ZFS systems with directories containing a single small file it 
+can causes inflated capacity usage numbers and make carfiles significantly 
+larger in size due to this behavior.  It is recommended that this behavior be 
+tracked and potentially an xfs or ext4 type of filesystem is used.
+
 
