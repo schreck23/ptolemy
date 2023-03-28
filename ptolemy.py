@@ -7,7 +7,6 @@ Created on Wed Mar 15 20:02:04 2023
 """
 
 import fastapi
-import uvicorn
 import logging
 import dbmanager
 import time
@@ -16,6 +15,7 @@ import requests
 import random
 import string
 import math
+import configparser
 
 from multiprocessing import Pool
 from pydantic import BaseModel
@@ -30,7 +30,20 @@ logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/
 #
 app = FastAPI()
 app = fastapi.FastAPI()
-    
+
+config = configparser.ConfigParser()
+config.read('ptolemy.ini')
+
+ip_address = config.get('orchestrator', 'ip_addr')
+run_port = config.get('orchestrator', 'port')
+orch_workers = config.get('orchestrator', 'api_threads')
+
+
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run("ptolemy:app", host=ip_address, port=int(run_port), workers=int(orch_workers))
+   
 #
 # Used to configure a job and store any related job metadata to ensure 
 # the operation is handled properly.  It should be noted shard_size and car_size
@@ -187,10 +200,10 @@ def containerize_structure(project: str):
         
         # utility commands for use in our method.
         table_command = """
-            CREATE TABLE IF NOT EXISTS ptolemy_cars (car_id TEXT PRIMARY KEY, cid TEXT, project TEXT, commp TEXT, processed BOOLEAN);
+            CREATE TABLE IF NOT EXISTS ptolemy_cars (car_id TEXT PRIMARY KEY, cid TEXT, project TEXT, commp TEXT, processed BOOLEAN, size BIGINT, padded_size BIGINT);
             """
         add_command = """
-            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f');
+            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed, size, padded_size) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f', 0, 0);
             """
         update_command = """
             UPDATE %s SET carfile = '%s' WHERE file_id = \'%s\';
@@ -407,14 +420,22 @@ async def process_blitz(project: str, background_tasks: BackgroundTasks):
 #
 @app.get("/v0/carfile_meta/{project}")
 async def get_carfile_meta(project: str):
+
     dbmgr = dbmanager.DbManager()
     
     try:
         query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\';"
         results = dbmgr.exe_fetch_all(query_command % project)
-        return results
+        template = {}
+        car_list = []
+        for iter in results:
+            template = {'payload_cid' : iter[0], 'commp' : iter[1], 'size' : iter[2], 'padded_size' : iter[3]}
+            car_list.append(template)
+        return car_list
     except(Exception) as error:
         logging.debug(error)
+        return {"message":error}
 #
 # Run a serial build of all the car files in our database for this project.
 #
+

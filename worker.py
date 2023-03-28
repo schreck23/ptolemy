@@ -7,7 +7,6 @@ Created on Sat Mar 18 09:59:34 2023
 """
 
 import fastapi
-import uvicorn
 import logging
 import requests
 import time
@@ -16,7 +15,8 @@ import dbmanager
 import os
 import shutil
 from multiprocessing import Pool
-
+import subprocess
+import re
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 
@@ -29,6 +29,11 @@ app = fastapi.FastAPI()
 
 config = configparser.ConfigParser()
 config.read('worker.ini')
+
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')))
 
 connected = False
 
@@ -204,10 +209,39 @@ def process_car(cariter, project):
             os.makedirs(landing_spot, exist_ok=True)
             shutil.copy(file_iter[0], landing_spot)
             logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
-    cursor.execute(update_command % cariter.car_name)
-    logging.debug("Finished build car file %s and placing it in our staging area." % cariter.car_name)
-    conn.close()
+            
+    logging.debug("Finished building car container %s and placing it in our staging area." % cariter.car_name)
     
+    car_path = os.path.join(project_meta[0], cariter.car_name)
+    
+    command = "/root/go/bin/car c --version 1 -f /srv/delta-staging/shrek-staging/ptolemy-test/%s.car /srv/delta-staging/shrek-staging/ptolemy-test/%s"
+    logging.debug("Executing command go-car for dir %s" % cariter.car_name)
+    result = subprocess.run(command % (cariter.car_name, cariter.car_name), capture_output=True, shell=True)
+
+    stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
+    root_cmd = "/home/shrek/go/bin/car root %s"
+    target_car = os.path.join(project_meta[0], cariter.car_name + ".car")
+    root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
+    commp_result = subprocess.run((stream_cmd % target_car), capture_output=True, check=True, text=True, shell=True)
+    out = commp_result.stderr.strip()
+
+    commp_re = re.compile('CommPCid: (b[A-Za-z2-7]{58,})')
+    corrupt_re = re.compile('\*CORRUPTED\*')
+    padded_piece_re = re.compile('Padded piece:\s+(\d+)\sbytes')
+    payload_re = re.compile('Payload:\s+(\d+)\sbytes')
+
+    commp_m = commp_re.findall(out)
+    corrupt = corrupt_re.match(out)
+    padded_piece_m = padded_piece_re.findall(out)
+    payload_m = payload_re.findall(out)
+    
+    sql_command = "UPDATE ptolemy_cars SET cid=\'%s\', commp=\'%s\', size=%i, padded_size=%i, processed='t' WHERE car_id=\'%s\';"
+    cursor.execute(sql_command % (root_result.stdout.strip(), commp_m[0], int(payload_m[0]), int(padded_piece_m[0]), cariter.car_name))
+    conn.commit()
+    new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
+    shutil.move(target_car, new_car_name)
+    conn.close()
+
 #
 #
 #
@@ -221,11 +255,11 @@ async def blitz_build(project: str, background_tasks: BackgroundTasks):
 #
 def blitz(project: str):
     global the_highway
-    pool = Pool(processes=8)
+    pool = Pool(processes=int(config.get('worker', 'threads')))
     
     for iter in the_highway.highway:
         if(project == iter[0]):
             pool.apply_async(process_car, args=(iter[1], project))     
-
     pool.close()
     pool.join()
+    

@@ -91,7 +91,6 @@ class DbManager:
         except(Exception, psycopg2.DatabaseError) as error:
             logging.error(error)
 
-
     #
     # Gracefully close our database connection
     #
