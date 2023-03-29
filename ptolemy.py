@@ -17,7 +17,6 @@ import string
 import math
 import configparser
 
-from multiprocessing import Pool
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -386,6 +385,7 @@ def prime_workers(project):
         if(len(workers) == 0):
             logging.debug("No workers present, priming cannot be completed.")
         else:
+            # Tell the workers what carfiles they will be building.
             car_files = dbmgr.getProjectCarFiles(project)
             while(len(car_files) > 0 and len(workers) > 0):
                 for worker in workers:
@@ -403,6 +403,16 @@ def prime_workers(project):
                         dbmgr.db_bulk_commit()
                         
                         workers = dbmgr.exe_fetch_all(worker_command)
+                        
+            # Now it is time to tell the workers to get to it.
+            for worker in workers:
+                url = "http://" + worker[0] + ":" + worker[1] + "/v0/blitz/" + project
+                response = requests.post(url)
+                if response.status_code == 200:
+                    logging.debug("Sent car file to worker.")
+                else:
+                    logging.error("Unable to start the worker: %s:%s" %  (worker[0], worker[1]))
+
     except(Exception) as error:
         logging.debug(error)
 
