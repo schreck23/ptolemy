@@ -160,10 +160,7 @@ def process_car(cariter, project):
     project_command = """
         SELECT staging_dir, shard_size FROM ptolemy_projects WHERE project = \'%s\';
         """
-    update_command = """
-        UPDATE ptolemy_cars SET processed = 't' WHERE car_id = \'%s\';
-        """
-
+        
     conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
     cursor = conn.cursor()    
 
@@ -181,67 +178,76 @@ def process_car(cariter, project):
     # Iterate through each file and place it in the car staging area,
     # if a file shard is requested we must split the file as well.
     for file_iter in file_list:
-        if('.ptolemy' in file_iter[0]):
-            # We check to see if the shard exists in staging then move it, otherwise
-            # we shard the main file and then move the shard we are targeting.
-            temp = os.path.join(project_meta[0], file_iter[0][1:])
-            if(os.path.isfile(temp)):
-                logging.debug("Found shard %s and placing in car directory." % file_iter[0])
-                root = os.path.split(file_iter[0])
-                car_stage = os.path.join(project_meta[0], cariter.car_name)
-                landing_spot = os.path.join(car_stage, root[0][1:])
-                os.makedirs(landing_spot, exist_ok=True)
-                shutil.move(temp, landing_spot)                
-                logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
+        try:
+            if('.ptolemy' in file_iter[0]):
+                # We check to see if the shard exists in staging then move it, otherwise
+                # we shard the main file and then move the shard we are targeting.
+                temp = os.path.join(project_meta[0], file_iter[0][1:])
+                if(os.path.isfile(temp)):
+                    logging.debug("Found shard %s and placing in car directory." % file_iter[0])
+                    root = os.path.split(file_iter[0])
+                    car_stage = os.path.join(project_meta[0], cariter.car_name)
+                    landing_spot = os.path.join(car_stage, root[0][1:])
+                    os.makedirs(landing_spot, exist_ok=True)
+                    shutil.move(temp, landing_spot)                
+                    logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
+                else:
+                    pathing = file_iter[0].split('.ptolemy')
+                    split_file(pathing[0], piece_size, project_meta[0])
+                    root = os.path.split(file_iter[0])
+                    car_stage = os.path.join(project_meta[0], cariter.car_name)
+                    landing_spot = os.path.join(car_stage, root[0][1:])
+                    os.makedirs(landing_spot, exist_ok=True)
+                    shutil.move(temp, landing_spot)                
+                    logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))                
             else:
-                pathing = file_iter[0].split('.ptolemy')
-                split_file(pathing[0], piece_size, project_meta[0])
                 root = os.path.split(file_iter[0])
                 car_stage = os.path.join(project_meta[0], cariter.car_name)
                 landing_spot = os.path.join(car_stage, root[0][1:])
                 os.makedirs(landing_spot, exist_ok=True)
-                shutil.move(temp, landing_spot)                
-                logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))                
-        else:
-            root = os.path.split(file_iter[0])
-            car_stage = os.path.join(project_meta[0], cariter.car_name)
-            landing_spot = os.path.join(car_stage, root[0][1:])
-            os.makedirs(landing_spot, exist_ok=True)
-            shutil.copy(file_iter[0], landing_spot)
-            logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
-            
+                shutil.copy(file_iter[0], landing_spot)
+                logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))   
+        except(Exception) as error:
+            logging.error(error)       
+
     logging.debug("Finished building car container %s and placing it in our staging area." % cariter.car_name)
     
-    car_path = os.path.join(project_meta[0], cariter.car_name)
+    try:                    
     
-    command = "/root/go/bin/car c --version 1 -f /srv/delta-staging/shrek-staging/ptolemy-test/%s.car /srv/delta-staging/shrek-staging/ptolemy-test/%s"
-    logging.debug("Executing command go-car for dir %s" % cariter.car_name)
-    result = subprocess.run(command % (cariter.car_name, cariter.car_name), capture_output=True, shell=True)
-
-    stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
-    root_cmd = "/home/shrek/go/bin/car root %s"
-    target_car = os.path.join(project_meta[0], cariter.car_name + ".car")
-    root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
-    commp_result = subprocess.run((stream_cmd % target_car), capture_output=True, check=True, text=True, shell=True)
-    out = commp_result.stderr.strip()
-
-    commp_re = re.compile('CommPCid: (b[A-Za-z2-7]{58,})')
-    corrupt_re = re.compile('\*CORRUPTED\*')
-    padded_piece_re = re.compile('Padded piece:\s+(\d+)\sbytes')
-    payload_re = re.compile('Payload:\s+(\d+)\sbytes')
-
-    commp_m = commp_re.findall(out)
-    corrupt = corrupt_re.match(out)
-    padded_piece_m = padded_piece_re.findall(out)
-    payload_m = payload_re.findall(out)
+        car_path = os.path.join(project_meta[0], cariter.car_name)
+        
+        command = "/root/go/bin/car c --version 1 -f /srv/delta-staging/shrek-staging/ptolemy-test/%s.car /srv/delta-staging/shrek-staging/ptolemy-test/%s"
+        logging.debug("Executing command go-car for dir %s" % cariter.car_name)
+        result = subprocess.run(command % (cariter.car_name, cariter.car_name), capture_output=True, shell=True)
     
-    sql_command = "UPDATE ptolemy_cars SET cid=\'%s\', commp=\'%s\', size=%i, padded_size=%i, processed='t' WHERE car_id=\'%s\';"
-    cursor.execute(sql_command % (root_result.stdout.strip(), commp_m[0], int(payload_m[0]), int(padded_piece_m[0]), cariter.car_name))
-    conn.commit()
-    new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
-    shutil.move(target_car, new_car_name)
-    conn.close()
-
+        stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
+        root_cmd = "/home/shrek/go/bin/car root %s"
+        target_car = os.path.join(project_meta[0], cariter.car_name + ".car")
+        root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
+        commp_result = subprocess.run((stream_cmd % target_car), capture_output=True, check=True, text=True, shell=True)
+        out = commp_result.stderr.strip()
+    
+        commp_re = re.compile('CommPCid: (b[A-Za-z2-7]{58,})')
+        corrupt_re = re.compile('\*CORRUPTED\*')
+        padded_piece_re = re.compile('Padded piece:\s+(\d+)\sbytes')
+        payload_re = re.compile('Payload:\s+(\d+)\sbytes')
+    
+        commp_m = commp_re.findall(out)
+        corrupt = corrupt_re.match(out)
+        padded_piece_m = padded_piece_re.findall(out)
+        payload_m = payload_re.findall(out)
+        
+        sql_command = "UPDATE ptolemy_cars SET cid=\'%s\', commp=\'%s\', size=%i, padded_size=%i, processed='t' WHERE car_id=\'%s\';"
+        cursor.execute(sql_command % (root_result.stdout.strip(), commp_m[0], int(payload_m[0]), int(padded_piece_m[0]), cariter.car_name))
+        conn.commit()
+        new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
+        shutil.move(target_car, new_car_name)
+        conn.close()
+    
+    except(Exception) as error:
+        logging.error(error)
+        conn.rollback()
+        conn.close()
 #
 #
 #

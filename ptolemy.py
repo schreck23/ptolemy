@@ -385,8 +385,12 @@ def prime_workers(project):
         if(len(workers) == 0):
             logging.debug("No workers present, priming cannot be completed.")
         else:
+            car_command = """
+                SELECT car_id FROM ptolemy_cars WHERE project = \'%s\' AND processed = 'f';
+                """
             # Tell the workers what carfiles they will be building.
-            car_files = dbmgr.getProjectCarFiles(project)
+            car_files = dbmgr.exe_fetch_all(car_command % project)
+            
             while(len(car_files) > 0 and len(workers) > 0):
                 for worker in workers:
                     url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
@@ -409,7 +413,7 @@ def prime_workers(project):
                 url = "http://" + worker[0] + ":" + worker[1] + "/v0/blitz/" + project
                 response = requests.post(url)
                 if response.status_code == 200:
-                    logging.debug("Sent car file to worker.")
+                    logging.debug("Invoking blitz build with worker.")
                 else:
                     logging.error("Unable to start the worker: %s:%s" %  (worker[0], worker[1]))
 
@@ -425,6 +429,28 @@ async def process_blitz(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(prime_workers, project)
     return {"message" : "Beginning blitz build for worker."}
 
+#
+#
+#
+@app.get("/v0/projects/")
+async def get_project_list():
+
+    dbmgr = dbmanager.DbManager()
+    
+    try:
+        query_command = "SELECT project, status FROM ptolemy_projects;"
+        results = dbmgr.exe_fetch_all(query_command)
+        template = {}
+        project_list = []
+        
+        for iter in results:
+            template = {'project' : iter[0], 'status' : iter[1]}
+            project_list.append(template)
+        return project_list
+    except(Exception) as error:
+        logging.debug(error)
+        return {"message":error}
+    
 #
 #
 #
@@ -445,7 +471,5 @@ async def get_carfile_meta(project: str):
     except(Exception) as error:
         logging.debug(error)
         return {"message":error}
-#
-# Run a serial build of all the car files in our database for this project.
-#
+
 
