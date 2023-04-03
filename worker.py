@@ -22,7 +22,7 @@ from fastapi import FastAPI, File, UploadFile, status, HTTPException, Background
 
 import psycopg2
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
+logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
@@ -75,7 +75,7 @@ register()
 # is still functional.
 #
 @app.get("/v0/heartbeat/")
-async def return_heartbeat():
+def return_heartbeat():
     workip = config.get('worker', 'ip_addr')
     workport = config.get('worker', 'port')
     logging.debug("Worker %s with port %s is alive and well." % (workip, workport))
@@ -119,11 +119,12 @@ class CarFile(BaseModel):
 #
 #
 @app.post("/v0/carfile/{project}")
-async def add_car_to_queue(project: str, car: CarFile):
+def add_car_to_queue(project: str, car: CarFile):
     global the_highway
     pair = [project, car]
     the_highway.enqueue(pair)
     logging.debug("Adding car named %s to the highway." % car)
+    return {"message" : "Adding car file to assembly line."}
     
 
 #
@@ -171,7 +172,7 @@ def process_car(cariter, project):
     file_list = cursor.fetchall()
     
     os.makedirs(os.path.join(project_meta[0], cariter.car_name), exist_ok=True)
-    logging.debug("Running car build for artifact: %s" % cariter.car_name)
+    logging.info("Running car build for artifact: %s" % cariter.car_name)
     
     piece_size = 1024 * 1024 * 1024 * project_meta[1]
     
@@ -210,18 +211,19 @@ def process_car(cariter, project):
         except(Exception) as error:
             logging.error(error)       
 
-    logging.debug("Finished building car container %s and placing it in our staging area." % cariter.car_name)
+    logging.info("Finished building car container %s and placing it in our staging area." % cariter.car_name)
     
     try:                    
     
         car_path = os.path.join(project_meta[0], cariter.car_name)
         
         command = "/root/go/bin/car c --version 1 -f /srv/delta-staging/shrek-staging/ptolemy-test/%s.car /srv/delta-staging/shrek-staging/ptolemy-test/%s"
-        logging.debug("Executing command go-car for dir %s" % cariter.car_name)
+        logging.info("Executing command go-car for dir %s" % cariter.car_name)
         result = subprocess.run(command % (cariter.car_name, cariter.car_name), capture_output=True, shell=True)
     
         stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
         root_cmd = "/home/shrek/go/bin/car root %s"
+        logging.info("Calculating root CID and commp for %s" % cariter.car_name)
         target_car = os.path.join(project_meta[0], cariter.car_name + ".car")
         root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
         commp_result = subprocess.run((stream_cmd % target_car), capture_output=True, check=True, text=True, shell=True)
@@ -243,6 +245,9 @@ def process_car(cariter, project):
         new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
         shutil.move(target_car, new_car_name)
         conn.close()
+        
+        # clean up the staging directory
+        shutil.rmtree(car_path)
     
     except(Exception) as error:
         logging.error(error)
@@ -259,7 +264,7 @@ async def blitz_build(project: str, background_tasks: BackgroundTasks):
 #
 # Run the blitz
 #
-def blitz(project: str):
+async def blitz(project: str):
     global the_highway
     pool = Pool(processes=int(config.get('worker', 'threads')))
     

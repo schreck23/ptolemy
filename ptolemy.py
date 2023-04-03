@@ -22,7 +22,7 @@ from fastapi import FastAPI, File, UploadFile, status, HTTPException, Background
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG, filename='/tmp/ptolemy.log')
+logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 #
 # FastAPI for our HTTP routes
@@ -75,6 +75,7 @@ async def define_project(project: str, metadata: Project):
         dbmgr.execute_command(insert_command % (project, metadata.shard_size, metadata.car_size, metadata.encryption, metadata.staging_dir, metadata.target_dir, metadata.load_type))
         dbmgr.db_bulk_commit()
         dbmgr.close_db_conn()
+        return {"message" : "Added new project to the database."}
     except(Exception) as error:
         dbmgr.close_db_conn()
         raise HTTPException(status_code=500, detail=str(error))            
