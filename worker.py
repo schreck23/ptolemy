@@ -217,9 +217,9 @@ def process_car(cariter, project):
     
         car_path = os.path.join(project_meta[0], cariter.car_name)
         
-        command = "/root/go/bin/car c --version 1 -f /srv/delta-staging/shrek-staging/ptolemy-test/%s.car /srv/delta-staging/shrek-staging/ptolemy-test/%s"
+        command = "/root/go/bin/car c --version 1 -f %s.car %s"
         logging.info("Executing command go-car for dir %s" % cariter.car_name)
-        result = subprocess.run(command % (cariter.car_name, cariter.car_name), capture_output=True, shell=True)
+        result = subprocess.run(command % (car_path, car_path), capture_output=True, shell=True)
     
         stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
         root_cmd = "/home/shrek/go/bin/car root %s"
