@@ -88,14 +88,21 @@ on this to follow as well).
 Once dependencies are resolved:
 
 We can launch the ptolemy orchestrator using the following command:
-uvicorn ptolemy:app --port <port to use (default 8000)> --host 0.0.0.0 (can be
-set to another IP to control endpoint broadcast as well)
+python3 ptolemy.py
+
+* Please ensure the ptolemy.ini file is properly configured with desired 
+IP to listen on for the orchestrator along with the port.
 
 Then launch a worker to do the orchestrators dirty work (it should be noted
 that only one worker per IP is allowed, however setting up workers on other
 machines or containers is supported).
 
-uvicorn worker:app --port <port to use (default 8000)> --host <machine IP>
+python3 worker.py 
+
+* Please ensure the IP and port are set along with a desired thread count to use
+for processing by the worker.  It should be noted the IP address should be the 
+actual machine IP so the orchestrator can communicate with the worker effectively.
+Attempting to use 0.0.0.0 will not work as the listening IP.
 
 The worker when launched will automatically connect to the orchestrator and 
 begin responding to heartbeats for worker fault detection.
