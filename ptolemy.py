@@ -41,7 +41,7 @@ orch_workers = config.get('orchestrator', 'api_threads')
 # Run the application
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run("ptolemy:app", host=ip_address, port=int(run_port), workers=int(orch_workers))
+    uvicorn.run("ptolemy:app", host=ip_address, port=int(run_port), workers=int(orch_workers), log_level="warning")
    
 #
 # Used to configure a job and store any related job metadata to ensure 
@@ -61,7 +61,7 @@ class Project(BaseModel):
 # project metadata in a table and prepare the environmentals.
 #
 @app.post("/v0/create/{project}")
-async def define_project(project: str, metadata: Project):
+def define_project(project: str, metadata: Project):
 
     try:
         dbmgr = dbmanager.DbManager()
@@ -87,7 +87,7 @@ async def define_project(project: str, metadata: Project):
 # also calculate the file splits along boundaries to help with containerization.
 #
 @app.post("/v0/scan/{project}")
-async def project_scan(project: str, background_tasks: BackgroundTasks):
+def project_scan(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(scan_task, project)
     return {"message": "Connecting to database and starting filesystem scan."}
 
@@ -182,7 +182,7 @@ def generate_car_name():
 # Containerize and create boundaries for the car files.
 #
 @app.post("/v0/containerize/{project}")
-async def make_containers(project: str, background_tasks: BackgroundTasks):
+def make_containers(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(containerize_structure, project)
     return {"message": "Connecting to database and performing containerization."}
 
@@ -292,7 +292,7 @@ class Worker(BaseModel):
 # Route used by a worker to register for car generation workloads.
 #
 @app.post("/v0/worker/")
-async def handle_worker(worker: Worker, background_tasks: BackgroundTasks):
+def handle_worker(worker: Worker, background_tasks: BackgroundTasks):
     background_tasks.add_task(register_worker, worker)
     background_tasks.add_task(worker_heartbeat, worker)
     return {"message": "Connecting to database and performing containerization."}
@@ -417,16 +417,18 @@ def prime_workers(project):
                     logging.debug("Invoking blitz build with worker.")
                 else:
                     logging.error("Unable to start the worker: %s:%s" %  (worker[0], worker[1]))
-
+            return {"message" : "All done priming workers."}
+        
     except(Exception) as error:
+        return {"message" : error}
         logging.debug(error)
-
+        
 
 #
 # Run a blitz build of all the car files in our database for this project.
 #
 @app.post("/v0/blitz/{project}")
-async def process_blitz(project: str, background_tasks: BackgroundTasks):
+def process_blitz(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(prime_workers, project)
     return {"message" : "Beginning blitz build for worker."}
 
@@ -434,7 +436,7 @@ async def process_blitz(project: str, background_tasks: BackgroundTasks):
 #
 #
 @app.get("/v0/projects/")
-async def get_project_list():
+def get_project_list():
 
     dbmgr = dbmanager.DbManager()
     
@@ -456,7 +458,7 @@ async def get_project_list():
 #
 #
 @app.get("/v0/carfile_meta/{project}")
-async def get_carfile_meta(project: str):
+def get_carfile_meta(project: str):
 
     dbmgr = dbmanager.DbManager()
     

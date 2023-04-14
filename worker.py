@@ -33,7 +33,7 @@ config.read('worker.ini')
 # Run the application
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')))
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
 
 connected = False
 
@@ -217,7 +217,7 @@ def process_car(cariter, project):
     
         car_path = os.path.join(project_meta[0], cariter.car_name)
         
-        command = "/root/go/bin/car c --version 1 -f %s.car %s"
+        command = "/home/shrek/go/bin/car c --version 1 -f %s.car %s"
         logging.info("Executing command go-car for dir %s" % cariter.car_name)
         result = subprocess.run(command % (car_path, car_path), capture_output=True, shell=True)
     
@@ -253,24 +253,32 @@ def process_car(cariter, project):
         logging.error(error)
         conn.rollback()
         conn.close()
+
+#
+# Define a global process pool for our application to manage parallel
+# car generation.
+#
+pool = Pool(processes=int(config.get('worker', 'threads')))
+
 #
 #
 #
 @app.post("/v0/blitz/{project}")
-async def blitz_build(project: str, background_tasks: BackgroundTasks):
+def blitz_build(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(blitz, project)
     return {"Message" : "Worker performing blitz build in background."}
 
 #
 # Run the blitz
 #
-async def blitz(project: str):
+def blitz(project: str):
     global the_highway
-    pool = Pool(processes=int(config.get('worker', 'threads')))
+    global pool
     
     for iter in the_highway.highway:
         if(project == iter[0]):
             pool.apply_async(process_car, args=(iter[1], project))     
-    pool.close()
-    pool.join()
+    #pool.close()
+    #pool.join()
+    return {"message" : "Cars have been added to worker, starting processing job."}
     
