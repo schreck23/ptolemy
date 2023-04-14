@@ -463,7 +463,7 @@ def get_carfile_meta(project: str):
     dbmgr = dbmanager.DbManager()
     
     try:
-        query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\';"
+        query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\' AND processed = 'f';"
         results = dbmgr.exe_fetch_all(query_command % project)
         template = {}
         car_list = []
