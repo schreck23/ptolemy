@@ -231,6 +231,7 @@ def process_car(cariter, project):
     
         the_highway.remove(cariter)
         logging.info("Completed build of car file, %i car files left in the queue." % len(the_highway))
+        
     except(Exception) as error:
         logging.error(error)
         conn.rollback()
