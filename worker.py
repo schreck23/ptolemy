@@ -82,32 +82,9 @@ def return_heartbeat():
     
 
 #
-# Class developed to manage our queue for our car files.  Also know as 
-# the highway.
-#
-class TheHighway:
-    
-    def __init__(self):
-        self.highway = []
-
-    def enqueue(self, carfile):
-        self.highway.append(carfile)
-
-    def dequeue(self):
-        if self.is_empty():
-            return None
-        return self.highway.pop(0)
-
-    def is_empty(self):
-        return len(self.highway) == 0
-    
-    def reset_queue(self):
-        self.highway = []
-    
-#
 # Manages our car queue for processing. 
 #
-the_highway = TheHighway()
+the_highway = []
 
 #
 #
@@ -122,7 +99,7 @@ class CarFile(BaseModel):
 def add_car_to_queue(project: str, car: CarFile):
     global the_highway
     pair = [project, car]
-    the_highway.enqueue(pair)
+    the_highway.append(pair)
     logging.debug("Adding car named %s to the highway." % car)
     return {"message" : "Adding car file to assembly line."}
     
@@ -154,6 +131,9 @@ def split_file(file_id, piece_size, staging_dir):
 #
 def process_car(cariter, project):
         
+    # Tap into the queue and we will pop the car entry off below once complete.
+    global the_highway
+    
     # Command to get the list of car files we are building
     list_command = """
         SELECT file_id, size FROM %s WHERE carfile = \'%s\' ;
@@ -249,6 +229,8 @@ def process_car(cariter, project):
         # clean up the staging directory
         shutil.rmtree(car_path)
     
+        the_highway.remove(cariter)
+        logging.info("Completed build of car file, %i car files left in the queue." % len(the_highway))
     except(Exception) as error:
         logging.error(error)
         conn.rollback()
@@ -275,9 +257,9 @@ def blitz(project: str):
     global the_highway
     global pool
     
-    for iter in the_highway.highway:
+    for iter in the_highway:
         if(project == iter[0]):
-            pool.apply_async(process_car, args=(iter[1], project))     
+            pool.apply_async(process_car, args=(iter[1], project))   
     #pool.close()
     #pool.join()
     return {"message" : "Cars have been added to worker, starting processing job."}
