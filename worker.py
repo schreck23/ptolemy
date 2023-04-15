@@ -18,7 +18,7 @@ import subprocess
 import re
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
-
+from multiprocessing import Pool
 import psycopg2
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
@@ -30,6 +30,7 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
+pool = Pool(processes=int(config.get('worker', 'threads')))
 
 def register():
 
@@ -257,4 +258,3 @@ def blitz(project: str):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
     
-pool = Pool(processes=int(config.get('worker', 'threads')))
