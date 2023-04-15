@@ -237,9 +237,6 @@ if __name__ == '__main__':
     from multiprocessing import Pool
     uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
 
-
-pool = Pool(processes=int(config.get('worker', 'threads')))
-
 #
 #
 #
@@ -260,3 +257,4 @@ def blitz(project: str):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
     
+pool = Pool(processes=int(config.get('worker', 'threads')))
