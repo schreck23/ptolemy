@@ -255,6 +255,6 @@ def blitz(project: str):
 if __name__ == '__main__':
     import uvicorn
     from multiprocessing import Pool
-    pool = Pool(processes=int(config.get('worker', 'threads')))
     uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-    
+
+pool = Pool(processes=int(config.get('worker', 'threads')))    
