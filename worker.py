@@ -14,7 +14,6 @@ import configparser
 import dbmanager
 import os
 import shutil
-from multiprocessing import Pool
 import subprocess
 import re
 from pydantic import BaseModel
@@ -29,11 +28,6 @@ app = fastapi.FastAPI()
 
 config = configparser.ConfigParser()
 config.read('worker.ini')
-
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
 
 connected = False
 
@@ -238,12 +232,6 @@ def process_car(cariter, project):
         conn.close()
 
 #
-# Define a global process pool for our application to manage parallel
-# car generation.
-#
-pool = Pool(processes=int(config.get('worker', 'threads')))
-
-#
 #
 #
 @app.post("/v0/blitz/{project}")
@@ -263,3 +251,9 @@ def blitz(project: str):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
     
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    from multiprocessing import Pool
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
+    pool = Pool(processes=int(config.get('worker', 'threads')))
