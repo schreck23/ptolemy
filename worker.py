@@ -30,7 +30,6 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
-pool = Pool(processes=int(config.get('worker', 'threads')))
 
 def register():
 
@@ -232,12 +231,6 @@ def process_car(cariter, project):
         conn.rollback()
         conn.close()
 
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    from multiprocessing import Pool
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-
 #
 #
 #
@@ -257,4 +250,11 @@ def blitz(project: str):
         if(project == iter[0]):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
+
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    from multiprocessing import Pool
+    pool = Pool(processes=int(config.get('worker', 'threads')))
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
     
