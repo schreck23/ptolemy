@@ -18,6 +18,7 @@ import subprocess
 import re
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
+from multiprocessing import Pool
 
 import psycopg2
 
@@ -256,5 +257,4 @@ def blitz(project: str):
 # Run the application
 if __name__ == '__main__':
     import uvicorn
-    from multiprocessing import Pool
     uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
