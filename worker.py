@@ -37,7 +37,7 @@ connected = False
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-    set_start_method('fork')
+
 
 def register():
 
@@ -247,14 +247,12 @@ def blitz_build(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(blitz, project)
     return {"Message" : "Worker performing blitz build in background."}
     
-pool = Pool(processes=int(config.get('worker', 'threads'))) 
-
 #
 # Run the blitz
 #
 def blitz(project: str):
     global the_highway
-    global pool    
+    pool = Pool(processes=int(config.get('worker', 'threads'))) 
     
     for iter in the_highway:
         if(project == iter[0]):
