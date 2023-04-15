@@ -32,7 +32,6 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
-set_start_method('fork')
 
 # Run the application
 if __name__ == '__main__':
@@ -257,7 +256,8 @@ def blitz(project: str):
     
     for iter in the_highway:
         if(project == iter[0]):
-            pool.apply_async(process_car, args=(iter[1], project))   
+            pool.apply_async(process_car, args=(iter[1], project))  
+    pool.join()
     return {"message" : "Cars have been added to worker, starting processing job."}
 
    
