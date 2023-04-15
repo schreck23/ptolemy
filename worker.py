@@ -31,13 +31,6 @@ config.read('worker.ini')
 
 connected = False
 
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    from multiprocessing import Pool
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-
-
 def register():
 
     global connected
@@ -237,6 +230,13 @@ def process_car(cariter, project):
         logging.error(error)
         conn.rollback()
         conn.close()
+
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    from multiprocessing import Pool
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
+
 
 pool = Pool(processes=int(config.get('worker', 'threads')))
 
