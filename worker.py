@@ -18,7 +18,6 @@ import subprocess
 import re
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
-from multiprocessing import Pool
 
 import psycopg2
 
@@ -31,6 +30,13 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
+
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    from multiprocessing import Pool
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
+
 
 def register():
 
@@ -254,7 +260,3 @@ def blitz(project: str):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
     
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
