@@ -21,7 +21,7 @@ from fastapi import FastAPI, File, UploadFile, status, HTTPException, Background
 from multiprocessing import Pool
 from multiprocessing import set_start_method
 import psycopg2
-
+from concurrent.futures.thread import ThreadPoolExecutor
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
@@ -231,7 +231,6 @@ def process_car(cariter, project):
         # clean up the staging directory
         shutil.rmtree(car_path)
     
-        the_highway.remove(cariter)
         logging.info("Completed build of car file, %i car files left in the queue." % len(the_highway))
         
     except(Exception) as error:
@@ -252,13 +251,19 @@ def blitz_build(project: str, background_tasks: BackgroundTasks):
 #
 def blitz(project: str):
     global the_highway
-    pool = Pool(processes=int(config.get('worker', 'threads'))) 
+    executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
+    futures = []
+    #pool = Pool(processes=int(config.get('worker', 'threads'))) 
     
     for iter in the_highway:
         if(project == iter[0]):
-            pool.apply_async(process_car, args=(iter[1], project))  
-    pool.close()
-    pool.join()
+            futures.append(executor.submit(process_car, iter[1], project))
+            #pool.apply_async(process_car, args=(iter[1], project))  
+    #pool.close()
+    #pool.join()
+    
+    for future in futures:
+        future.result()
     
     return {"message" : "Cars have been added to worker, starting processing job."}
 
