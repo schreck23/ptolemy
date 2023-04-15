@@ -32,6 +32,7 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
+set_start_method('fork')
 
 # Run the application
 if __name__ == '__main__':
