@@ -19,8 +19,9 @@ import re
 from pydantic import BaseModel
 from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
 from multiprocessing import Pool
+from multiprocessing import set_start_method
 import psycopg2
-from multiprocessing import Pool
+
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
@@ -31,6 +32,8 @@ config = configparser.ConfigParser()
 config.read('worker.ini')
 
 connected = False
+
+set_start_method('fork')
 
 def register():
 
@@ -245,12 +248,14 @@ if __name__ == '__main__':
     import uvicorn
     uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
 
+pool = Pool(processes=int(config.get('worker', 'threads'))) 
+
 #
 # Run the blitz
 #
 def blitz(project: str):
     global the_highway
-    pool = Pool(processes=int(config.get('worker', 'threads'))) 
+    global pool    
     
     for iter in the_highway:
         if(project == iter[0]):
