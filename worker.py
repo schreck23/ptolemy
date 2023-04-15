@@ -239,6 +239,14 @@ def blitz_build(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(blitz, project)
     return {"Message" : "Worker performing blitz build in background."}
 
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    from multiprocessing import Pool
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
+
+pool = Pool(processes=int(config.get('worker', 'threads'))) 
+
 #
 # Run the blitz
 #
@@ -251,10 +259,4 @@ def blitz(project: str):
             pool.apply_async(process_car, args=(iter[1], project))   
     return {"message" : "Cars have been added to worker, starting processing job."}
 
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    from multiprocessing import Pool
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-
-pool = Pool(processes=int(config.get('worker', 'threads')))    
+   
