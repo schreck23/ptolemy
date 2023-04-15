@@ -257,7 +257,9 @@ def blitz(project: str):
     for iter in the_highway:
         if(project == iter[0]):
             pool.apply_async(process_car, args=(iter[1], project))  
+    pool.close()
     pool.join()
+    
     return {"message" : "Cars have been added to worker, starting processing job."}
 
    
