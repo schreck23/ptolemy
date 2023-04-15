@@ -33,7 +33,11 @@ config.read('worker.ini')
 
 connected = False
 
-set_start_method('fork')
+# Run the application
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
+    set_start_method('fork')
 
 def register():
 
@@ -242,12 +246,7 @@ def process_car(cariter, project):
 def blitz_build(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(blitz, project)
     return {"Message" : "Worker performing blitz build in background."}
-
-# Run the application
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run("worker:app", host=config.get('worker', 'ip_addr'), port=int(config.get('worker', 'port')), workers=int(config.get('worker', 'threads')), log_level="warning")
-
+    
 pool = Pool(processes=int(config.get('worker', 'threads'))) 
 
 #
