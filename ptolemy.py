@@ -405,6 +405,9 @@ def prime_workers(project):
                     dbmgr.execute_command(update_command % (worker[0], temp_car))
                     logging.info(update_command % (worker[0], temp_car))
                     logging.info("Assigning %s car to worker %s." % (temp_car, worker[0]))
+            
+            dbmgr.db_bulk_commit()
+            
             # while(len(car_files) > 0 and len(workers) > 0):
             #     for worker in workers:
             #         url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
