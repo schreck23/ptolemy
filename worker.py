@@ -150,11 +150,11 @@ def process_car(cariter, project):
     cursor.execute(project_command % project)
     project_meta = cursor.fetchone()
     
-    cursor.execute(list_command % (project, cariter.car_name))
+    cursor.execute(list_command % (project, cariter))
     file_list = cursor.fetchall()
     
-    os.makedirs(os.path.join(project_meta[0], cariter.car_name), exist_ok=True)
-    logging.info("Running car build for artifact: %s" % cariter.car_name)
+    os.makedirs(os.path.join(project_meta[0], cariter), exist_ok=True)
+    logging.info("Running car build for artifact: %s" % cariter)
     
     piece_size = 1024 * 1024 * 1024 * project_meta[1]
     
@@ -169,7 +169,7 @@ def process_car(cariter, project):
                 if(os.path.isfile(temp)):
                     logging.debug("Found shard %s and placing in car directory." % file_iter[0])
                     root = os.path.split(file_iter[0])
-                    car_stage = os.path.join(project_meta[0], cariter.car_name)
+                    car_stage = os.path.join(project_meta[0], cariter)
                     landing_spot = os.path.join(car_stage, root[0][1:])
                     os.makedirs(landing_spot, exist_ok=True)
                     shutil.move(temp, landing_spot)                
@@ -178,14 +178,14 @@ def process_car(cariter, project):
                     pathing = file_iter[0].split('.ptolemy')
                     split_file(pathing[0], piece_size, project_meta[0])
                     root = os.path.split(file_iter[0])
-                    car_stage = os.path.join(project_meta[0], cariter.car_name)
+                    car_stage = os.path.join(project_meta[0], cariter)
                     landing_spot = os.path.join(car_stage, root[0][1:])
                     os.makedirs(landing_spot, exist_ok=True)
                     shutil.move(temp, landing_spot)                
                     logging.debug("Placed file %s in car staging area %s." % (file_iter[0], landing_spot))                
             else:
                 root = os.path.split(file_iter[0])
-                car_stage = os.path.join(project_meta[0], cariter.car_name)
+                car_stage = os.path.join(project_meta[0], cariter)
                 landing_spot = os.path.join(car_stage, root[0][1:])
                 os.makedirs(landing_spot, exist_ok=True)
                 shutil.copy(file_iter[0], landing_spot)
@@ -193,20 +193,20 @@ def process_car(cariter, project):
         except(Exception) as error:
             logging.error(error)       
 
-    logging.info("Finished building car container %s and placing it in our staging area." % cariter.car_name)
+    logging.info("Finished building car container %s and placing it in our staging area." % cariter)
     
     try:                    
     
-        car_path = os.path.join(project_meta[0], cariter.car_name)
+        car_path = os.path.join(project_meta[0], cariter)
         
         command = "/home/shrek/go/bin/car c --version 1 -f %s.car %s"
-        logging.info("Executing command go-car for dir %s" % cariter.car_name)
+        logging.info("Executing command go-car for dir %s" % cariter)
         result = subprocess.run(command % (car_path, car_path), capture_output=True, shell=True)
     
         stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
         root_cmd = "/home/shrek/go/bin/car root %s"
-        logging.info("Calculating root CID and commp for %s" % cariter.car_name)
-        target_car = os.path.join(project_meta[0], cariter.car_name + ".car")
+        logging.info("Calculating root CID and commp for %s" % cariter)
+        target_car = os.path.join(project_meta[0], cariter + ".car")
         root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
         commp_result = subprocess.run((stream_cmd % target_car), capture_output=True, check=True, text=True, shell=True)
         out = commp_result.stderr.strip()
@@ -222,7 +222,7 @@ def process_car(cariter, project):
         payload_m = payload_re.findall(out)
         
         sql_command = "UPDATE ptolemy_cars SET cid=\'%s\', commp=\'%s\', size=%i, padded_size=%i, processed='t' WHERE car_id=\'%s\';"
-        cursor.execute(sql_command % (root_result.stdout.strip(), commp_m[0], int(payload_m[0]), int(padded_piece_m[0]), cariter.car_name))
+        cursor.execute(sql_command % (root_result.stdout.strip(), commp_m[0], int(payload_m[0]), int(padded_piece_m[0]), cariter))
         conn.commit()
         new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
         shutil.move(target_car, new_car_name)
