@@ -396,12 +396,13 @@ def prime_workers(project):
                 """
             # Tell the workers what carfiles they will be building.
             car_files = dbmgr.exe_fetch_all(car_command % project)
+            logging.info("Identified %i car files to build for %s." % (len(car_files), project))
             
             while(len(car_files) > 0 and len(workers) > 0):
                 for worker in workers:
                     update_command = "UPDATE ptolemy_cars SET worker_ip = '%s' WHERE car_id = '%s';"
                     dbmgr.execute_command(update_command % (worker[0], car_files.pop(0)[0]))
-
+                    logging.info("Assigning %s car to worker %s." % (len(car_files), project))
             # while(len(car_files) > 0 and len(workers) > 0):
             #     for worker in workers:
             #         url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
