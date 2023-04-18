@@ -18,9 +18,9 @@ import math
 import configparser
 
 from pydantic import BaseModel
-from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+#from fastapi.responses import FileResponse
+#from fastapi.responses import JSONResponse
 
 logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
@@ -200,10 +200,10 @@ def containerize_structure(project: str):
         
         # utility commands for use in our method.
         table_command = """
-            CREATE TABLE IF NOT EXISTS ptolemy_cars (car_id TEXT PRIMARY KEY, cid TEXT, project TEXT, commp TEXT, processed BOOLEAN, size BIGINT, padded_size BIGINT);
+            CREATE TABLE IF NOT EXISTS ptolemy_cars (car_id TEXT PRIMARY KEY, cid TEXT, project TEXT, commp TEXT, processed BOOLEAN, size BIGINT, padded_size BIGINT, worker_ip TEXT);
             """
         add_command = """
-            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed, size, padded_size) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f', 0, 0);
+            INSERT INTO ptolemy_cars (car_id, cid, project, commp, processed, size, padded_size, worker_ip) VALUES (\'%s\', ' ', \'%s\',  ' ', 'f', 0, 0, ' ');
             """
         update_command = """
             UPDATE %s SET carfile = '%s' WHERE file_id = \'%s\';
@@ -293,9 +293,10 @@ class Worker(BaseModel):
 #
 @app.post("/v0/worker/")
 def handle_worker(worker: Worker, background_tasks: BackgroundTasks):
-    background_tasks.add_task(register_worker, worker)
+    #background_tasks.add_task(register_worker, worker)
+    register_worker(worker)
     background_tasks.add_task(worker_heartbeat, worker)
-    return {"message": "Connecting to database and performing containerization."}
+    return {"message": "Registering worker and starting heartbeat."}
 
 def register_worker(worker: Worker):
 
@@ -394,20 +395,25 @@ def prime_workers(project):
             
             while(len(car_files) > 0 and len(workers) > 0):
                 for worker in workers:
-                    url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
-                    car_data = {"car_name" : car_files.pop(0)[0]}
-                    response = requests.post(url, json=car_data)
-                    if response.status_code == 200:
-                        logging.debug("Sent car file to worker.")
-                    else:
-                        logging.debug("Marking worker with IP: %s as down" % worker[0])
-                        fail_cmd = """
-                            UPDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
-                            """
-                        dbmgr.execute_command(fail_cmd % (worker.ip_addr, worker.port))
-                        dbmgr.db_bulk_commit()
+                    update_command = "UPDATE ptolemy_cars SET worker_ip = '%s' WHERE car_id = '%s';"
+                    dbmgr.execute_command(update_command % (worker[0], car_files.pop(0)[0]))
+
+            # while(len(car_files) > 0 and len(workers) > 0):
+            #     for worker in workers:
+            #         url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
+            #         car_data = {"car_name" : car_files.pop(0)[0]}
+            #         response = requests.post(url, json=car_data)
+            #         if response.status_code == 200:
+            #             logging.debug("Sent car file to worker.")
+            #         else:
+            #             logging.debug("Marking worker with IP: %s as down" % worker[0])
+            #             fail_cmd = """
+            #                 UPDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
+            #                 """
+            #             dbmgr.execute_command(fail_cmd % (worker.ip_addr, worker.port))
+            #             dbmgr.db_bulk_commit()
                         
-                        workers = dbmgr.exe_fetch_all(worker_command)
+            #             workers = dbmgr.exe_fetch_all(worker_command)
                         
             # Now it is time to tell the workers to get to it.
             for worker in workers:
@@ -417,11 +423,15 @@ def prime_workers(project):
                     logging.debug("Invoking blitz build with worker.")
                 else:
                     logging.error("Unable to start the worker: %s:%s" %  (worker[0], worker[1]))
-            return {"message" : "All done priming workers."}
+        
+        dbmgr.close_db_conn()        
+        return {"message" : "All done priming workers."}
         
     except(Exception) as error:
-        return {"message" : error}
         logging.debug(error)
+        dbmgr.close_db_conn()
+        return {"message" : error}
+        
         
 
 #
@@ -463,7 +473,7 @@ def get_carfile_meta(project: str):
     dbmgr = dbmanager.DbManager()
     
     try:
-        query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\' AND processed = 'f';"
+        query_command = "SELECT cid, commp, size, padded_size FROM ptolemy_cars WHERE project=\'%s\' AND processed = 't';"
         results = dbmgr.exe_fetch_all(query_command % project)
         template = {}
         car_list = []

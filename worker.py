@@ -86,24 +86,24 @@ def return_heartbeat():
 #
 # Manages our car queue for processing. 
 #
-the_highway = []
+#the_highway = []
 
 #
 #
 #
-class CarFile(BaseModel):
-    car_name: str
+#class CarFile(BaseModel):
+#    car_name: str
 
 #
 #
 #
-@app.post("/v0/carfile/{project}")
-def add_car_to_queue(project: str, car: CarFile):
-    global the_highway
-    pair = [project, car]
-    the_highway.append(pair)
-    logging.debug("Adding car named %s to the highway." % car)
-    return {"message" : "Adding car file to assembly line."}
+# @app.post("/v0/carfile/{project}")
+# def add_car_to_queue(project: str, car: CarFile):
+#     global the_highway
+#     pair = [project, car]
+#     the_highway.append(pair)
+#     logging.debug("Adding car named %s to the highway." % car)
+#     return {"message" : "Adding car file to assembly line."}
     
 
 #
@@ -250,17 +250,23 @@ def blitz_build(project: str, background_tasks: BackgroundTasks):
 # Run the blitz
 #
 def blitz(project: str):
-    global the_highway
+    #global the_highway
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
-    #pool = Pool(processes=int(config.get('worker', 'threads'))) 
+
+    dbmgr = dbmanager.DbManager()
+    car_command = "SELECT car_id FROM ptolemy_cars WHERE worker_ip = '%s' AND project = '%s';"
+    car_files = dbmgr.exe_fetch_all(car_command % (config.get('worker', 'ip_addr'), project))
     
-    for iter in the_highway:
-        if(project == iter[0]):
-            futures.append(executor.submit(process_car, iter[1], project))
-            #pool.apply_async(process_car, args=(iter[1], project))  
-    #pool.close()
-    #pool.join()
+    logging.info("Identified %i car files for %s worker to build." % (len(car_files), config.get('worker', 'ip_addr')))
+    
+    for iter in car_files:
+        logging.info("Allocating a thread to build container: %s" % iter[0])
+        futures.append(executor.submit(process_car, iter[0], project))
+        
+#    for iter in the_highway:
+#        if(project == iter[0]):
+#            futures.append(executor.submit(process_car, iter[1], project))
     
     for future in futures:
         future.result()
