@@ -294,9 +294,13 @@ class Worker(BaseModel):
 @app.post("/v0/worker/")
 def handle_worker(worker: Worker, background_tasks: BackgroundTasks):
     #background_tasks.add_task(register_worker, worker)
-    register_worker(worker)
-    background_tasks.add_task(worker_heartbeat, worker)
-    return {"message": "Registering worker and starting heartbeat."}
+    
+    try:
+        register_worker(worker)
+        background_tasks.add_task(worker_heartbeat, worker)
+        return {"message": "Registering worker and starting heartbeat."}
+    except(Exception) as error:
+        raise HTTPException(status_code=500, detail=str(error))
 
 def register_worker(worker: Worker):
 
