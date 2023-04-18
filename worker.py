@@ -262,11 +262,9 @@ def blitz(project: str):
     
     for iter in car_files:
         logging.info("Allocating a thread to build container: %s" % iter[0])
-        #futures.append(executor.submit(process_car, iter[0], project))
-        executor.map(process_car, iter[0], project)
-#    for iter in the_highway:
-#        if(project == iter[0]):
-#            futures.append(executor.submit(process_car, iter[1], project))
+        futures.append(executor.submit(process_car, iter[0], project))
+
+    logging.info("Size of futures is: %i" % len(futures))
     
     for future in futures:
         future.result()
