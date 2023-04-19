@@ -226,12 +226,13 @@ def process_car(cariter, project):
         conn.commit()
         new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
         shutil.move(target_car, new_car_name)
+        
+        
+        
         conn.close()
         
         # clean up the staging directory
         shutil.rmtree(car_path)
-    
-        logging.info("Completed build of car file, %i car files left in the queue." % len(the_highway))
         
     except(Exception) as error:
         logging.error(error)
