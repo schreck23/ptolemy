@@ -131,7 +131,7 @@ def scan_task(project: str):
             dbmgr.execute_command(status_command % project)
             chunk_size = 1024 * 1024 * 1024 * metadata[0]
             table_command = """
-                CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
+                CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size BIGINT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
                 """
             dbmgr.execute_command(table_command % project)
             dbmgr.db_bulk_commit()
