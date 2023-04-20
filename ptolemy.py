@@ -267,13 +267,19 @@ def containerize_structure(project: str):
         while (len(matrix) > 0):
             logging.debug("Top of while loop.")
             for iter in matrix:
+                file_path = iter[0]
                 counter += 1
+                if '"' in file_path:
+                    file_path = escape_quotes(file_path)
+                if "'" in file_path:
+                    file_path = escape_quotes(file_path)
+                
                 if(int(iter[1]) > 0):
                     if ((processed + int(iter[1])) < size):
                         processed += int(iter[1])
                         car_cache.append(iter[0])
-                        logging.debug(update_command % (project, car_name, iter[0]))
-                        dbmgr.execute_command(update_command % (project, car_name, iter[0]))
+                        logging.debug(update_command % (project, car_name, file_path))
+                        dbmgr.execute_command(update_command % (project, car_name, file_path))
                         logging.debug("Size is: %i" % processed)
                     else:
                         logging.debug(add_command % (car_name, project))
