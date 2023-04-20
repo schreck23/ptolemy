@@ -58,7 +58,6 @@ class Project(BaseModel):
 
 #
 # Ensure we escape all quotes included in filenames or postgres won't taake 
-# them.
 #
 def escape_quotes(s):
     escaped = ""
@@ -131,7 +130,7 @@ def scan_task(project: str):
             dbmgr.execute_command(status_command % project)
             chunk_size = 1024 * 1024 * 1024 * metadata[0]
             table_command = """
-                CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size BIGINT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
+                CREATE TABLE IF NOT EXISTS %s (file_id TEXT PRIMARY KEY, is_encrypted BOOLEAN, size INT, is_processed BOOLEAN, carfile TEXT, cid TEXT, shard_index INT, needs_sharding BOOLEAN);
                 """
             dbmgr.execute_command(table_command % project)
             dbmgr.db_bulk_commit()
@@ -144,33 +143,21 @@ def scan_task(project: str):
                     file_path = os.path.join(root, file)
                     file_size = os.path.getsize(file_path)
 
-                    if '"' in file_path:
-                        file_path = escape_quotes(file_path)
-                    if "'" in file_path:
-                        file_path = escape_quotes(file_path)
-
                     # If we have a file to split, add the base meta and calculate the shards, else just write the meta for the small file.
                     if(file_size > chunk_size):
-                        logging.info(file_command % (project, file_path, 0, 0, 't'))
                         dbmgr.execute_command(file_command % (project, file_path, 0, 0, 't'))
 
                         full_shards = math.floor(file_size / chunk_size)
                         remainder = file_size - (full_shards * chunk_size)
                         for i in range(0, int(full_shards)):
                             chunk_path = file_path + ".ptolemy" + str(i)
-                            logging.info(file_command % (project, chunk_path, chunk_size, i, 'f'))
                             dbmgr.execute_command(file_command % (project, chunk_path, chunk_size, i, 'f'))
-                            logging.info("Finished adding file to database for %s." %  file_path)
                         # write the remainder chunk
                         chunk_path = file_path + ".ptolemy" + str(full_shards)
-                        logging.info(file_command % (project, chunk_path, remainder, full_shards, 'f'))
                         dbmgr.execute_command(file_command % (project, chunk_path, remainder, full_shards, 'f'))
-                        logging.info("Finished adding file to database for %s." % file_path)
                         logging.debug("Adding large file: %s" % file_path)
                     else:
-                        logging.info(file_command % (project, file_path, file_size, 0, 'f'))
                         dbmgr.execute_command(file_command % (project, file_path, file_size, 0, 'f'))
-                        logging.info("Finished adding file to database for %s." % file_path )
                         logging.debug("Adding small file: %s" % file_path)
                     
                     #
@@ -195,6 +182,7 @@ def scan_task(project: str):
     except(Exception) as error:
         dbmgr.close_db_conn()
         raise HTTPException(status_code=500, detail=str(error))            
+
 #
 # Method used to generate random container names to prevent collisions.
 #
@@ -267,20 +255,13 @@ def containerize_structure(project: str):
         while (len(matrix) > 0):
             logging.debug("Top of while loop.")
             for iter in matrix:
-                
-                file_path = iter[0]
                 counter += 1
-                if '"' in file_path:
-                    file_path = escape_quotes(file_path)
-                if "'" in file_path:
-                    file_path = escape_quotes(file_path)
-                
                 if(int(iter[1]) > 0):
                     if ((processed + int(iter[1])) < size):
                         processed += int(iter[1])
                         car_cache.append(iter[0])
-                        logging.debug(update_command % (project, car_name, file_path))
-                        dbmgr.execute_command(update_command % (project, car_name, file_path))
+                        logging.debug(update_command % (project, car_name, iter[0]))
+                        dbmgr.execute_command(update_command % (project, car_name, iter[0]))
                         logging.debug("Size is: %i" % processed)
                     else:
                         logging.debug(add_command % (car_name, project))
