@@ -19,10 +19,9 @@ import configparser
 
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-#from fastapi.responses import FileResponse
-#from fastapi.responses import JSONResponse
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
+
+#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 #
 # FastAPI for our HTTP routes

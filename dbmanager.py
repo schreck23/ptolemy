@@ -6,9 +6,23 @@
 
 import psycopg2
 import logging
+import configparser
+from logging.handlers import RotatingFileHandler
 
+# Read configuration file
+config = configparser.ConfigParser()
+config.read('logging.ini')
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
+formatter = config.get('logging', 'format')
+datefmt = config.get('logging', 'datefmt')
+logfile = config.get('logging', 'logfile')
+
+logging.basicConfig(handlers=[RotatingFileHandler(logfile, maxBytes=100000, backupCount=10)], format=formatter, datefmt=datefmt)
+
+log_level = config.get('logging', 'log_level')
+logging.getLogger().setLevel(log_level)
+
+#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 class DbManager:
 
@@ -27,7 +41,7 @@ class DbManager:
 
         self.cursor.execute('SELECT version()')
         dbversion = self.cursor.fetchone()
-        logging.debug("Using postgres database version: " + str(dbversion))
+        return dbversion
 
     #
     # Used to execute a generic command

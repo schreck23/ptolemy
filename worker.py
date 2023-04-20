@@ -23,7 +23,7 @@ from multiprocessing import set_start_method
 import psycopg2
 from concurrent.futures.thread import ThreadPoolExecutor
 
-logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
+#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
