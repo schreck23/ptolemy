@@ -16,14 +16,13 @@ import os
 import shutil
 import subprocess
 import re
-from pydantic import BaseModel
-from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
-from multiprocessing import Pool
-from multiprocessing import set_start_method
+from fastapi import FastAPI, BackgroundTasks
+#from pydantic import BaseModel
+#from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
+#from multiprocessing import Pool
+#from multiprocessing import set_start_method
 import psycopg2
 from concurrent.futures.thread import ThreadPoolExecutor
-
-#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 app = FastAPI()
 app = fastapi.FastAPI()
@@ -82,30 +81,6 @@ def return_heartbeat():
     workport = config.get('worker', 'port')
     logging.debug("Worker %s with port %s is alive and well." % (workip, workport))
     
-
-#
-# Manages our car queue for processing. 
-#
-#the_highway = []
-
-#
-#
-#
-#class CarFile(BaseModel):
-#    car_name: str
-
-#
-#
-#
-# @app.post("/v0/carfile/{project}")
-# def add_car_to_queue(project: str, car: CarFile):
-#     global the_highway
-#     pair = [project, car]
-#     the_highway.append(pair)
-#     logging.debug("Adding car named %s to the highway." % car)
-#     return {"message" : "Adding car file to assembly line."}
-    
-
 #
 #
 #
@@ -226,8 +201,6 @@ def process_car(cariter, project):
         conn.commit()
         new_car_name = os.path.join(project_meta[0], commp_m[0] + ".car")
         shutil.move(target_car, new_car_name)
-        
-        
         
         conn.close()
         

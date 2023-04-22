@@ -20,8 +20,7 @@ import configparser
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 
-
-#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
+from concurrent.futures.thread import ThreadPoolExecutor
 
 #
 # FastAPI for our HTTP routes
@@ -258,7 +257,7 @@ def containerize_structure(project: str):
         car_cache = []
         car_name = generate_car_name()
 
-        # grab 300K of the files at a time, we don't want to grab millions and overwhealm the service
+        # grab 250K of the files at a time, we don't want to grab millions and overwhealm the service
         matrix = dbmgr.exe_fetch_many(fetch_command % project, 250000)
         
         counter = 0
@@ -321,9 +320,7 @@ class Worker(BaseModel):
 # Route used by a worker to register for car generation workloads.
 #
 @app.post("/v0/worker/")
-def handle_worker(worker: Worker, background_tasks: BackgroundTasks):
-    #background_tasks.add_task(register_worker, worker)
-    
+def handle_worker(worker: Worker, background_tasks: BackgroundTasks):    
     try:
         register_worker(worker)
         background_tasks.add_task(worker_heartbeat, worker)
@@ -436,24 +433,7 @@ def prime_workers(project):
                     logging.info("Assigning %s car to worker %s." % (temp_car, worker[0]))
             
             dbmgr.db_bulk_commit()
-            
-            # while(len(car_files) > 0 and len(workers) > 0):
-            #     for worker in workers:
-            #         url = "http://" + worker[0] + ":" + worker[1] + "/v0/carfile/" + project
-            #         car_data = {"car_name" : car_files.pop(0)[0]}
-            #         response = requests.post(url, json=car_data)
-            #         if response.status_code == 200:
-            #             logging.debug("Sent car file to worker.")
-            #         else:
-            #             logging.debug("Marking worker with IP: %s as down" % worker[0])
-            #             fail_cmd = """
-            #                 UPDATE ptolemy_workers SET active = 'f' WHERE ip_addr = '%s' AND port = '%s';
-            #                 """
-            #             dbmgr.execute_command(fail_cmd % (worker.ip_addr, worker.port))
-            #             dbmgr.db_bulk_commit()
-                        
-            #             workers = dbmgr.exe_fetch_all(worker_command)
-                        
+                                    
             # Now it is time to tell the workers to get to it.
             for worker in workers:
                 url = "http://" + worker[0] + ":" + worker[1] + "/v0/blitz/" + project
