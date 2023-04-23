@@ -35,6 +35,7 @@ ip_address = config.get('orchestrator', 'ip_addr')
 run_port = config.get('orchestrator', 'port')
 orch_workers = config.get('orchestrator', 'api_threads')
 
+executor = ThreadPoolExecutor(int(config.get('ptolemy', 'threads')))
 
 # Run the application
 if __name__ == '__main__':
@@ -101,6 +102,48 @@ def project_scan(project: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(scan_task, project)
     return {"message": "Connecting to database and starting filesystem scan."}
 
+def handle_file(dbmgr, path, chunk_size, project):
+
+    file_command = """
+        INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', %i, \'%s\');
+        """    
+    try:
+        file_size = os.path.getsize(path)
+        file_path = path
+    
+        if '"' in file_path:
+            file_path = escape_quotes(file_path)
+        if "'" in file_path:
+            file_path = escape_quotes(file_path)
+
+        # If we have a file to split, add the base meta and calculate the shards, else just write the meta for the small file.
+        if(file_size > chunk_size):
+            logging.info(file_command % (project, file_path, 0, 0, 't'))
+            dbmgr.execute_command(file_command % (project, file_path, 0, 0, 't'))
+
+            full_shards = math.floor(file_size / chunk_size)
+            remainder = file_size - (full_shards * chunk_size)
+            for i in range(0, int(full_shards)):
+                chunk_path = file_path + ".ptolemy" + str(i)
+                logging.info(file_command % (project, chunk_path, chunk_size, i, 'f'))
+                dbmgr.execute_command(file_command % (project, chunk_path, chunk_size, i, 'f'))
+                logging.info("Finished adding file to database for %s." %  file_path)
+            # write the remainder chunk
+            chunk_path = file_path + ".ptolemy" + str(full_shards)
+            logging.info(file_command % (project, chunk_path, remainder, full_shards, 'f'))
+            dbmgr.execute_command(file_command % (project, chunk_path, remainder, full_shards, 'f'))
+            logging.info("Finished adding file to database for %s." % file_path)
+            logging.debug("Adding large file: %s" % file_path)
+        else:
+            logging.info(file_command % (project, file_path, file_size, 0, 'f'))
+            dbmgr.execute_command(file_command % (project, file_path, file_size, 0, 'f'))
+            logging.info("Finished adding file to database for %s." % file_path )
+            logging.debug("Adding small file: %s" % file_path)
+
+        dbmgr.db_bulk_commit()
+    except(Exception) as error:
+        logging.error(error)
+
 #
 # The scan method used by our route above.
 #
@@ -108,6 +151,7 @@ def scan_task(project: str):
 
     counter = 0    
     dbmgr = dbmanager.DbManager()
+    futures = []
 
     try:
         
@@ -139,45 +183,11 @@ def scan_task(project: str):
             for root, dirs, files in os.walk(metadata[1]):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    file_size = os.path.getsize(file_path)
-
-                    if '"' in file_path:
-                        file_path = escape_quotes(file_path)
-                    if "'" in file_path:
-                        file_path = escape_quotes(file_path)
-
-                    # If we have a file to split, add the base meta and calculate the shards, else just write the meta for the small file.
-                    if(file_size > chunk_size):
-                        logging.info(file_command % (project, file_path, 0, 0, 't'))
-                        dbmgr.execute_command(file_command % (project, file_path, 0, 0, 't'))
-
-                        full_shards = math.floor(file_size / chunk_size)
-                        remainder = file_size - (full_shards * chunk_size)
-                        for i in range(0, int(full_shards)):
-                            chunk_path = file_path + ".ptolemy" + str(i)
-                            logging.info(file_command % (project, chunk_path, chunk_size, i, 'f'))
-                            dbmgr.execute_command(file_command % (project, chunk_path, chunk_size, i, 'f'))
-                            logging.info("Finished adding file to database for %s." %  file_path)
-                        # write the remainder chunk
-                        chunk_path = file_path + ".ptolemy" + str(full_shards)
-                        logging.info(file_command % (project, chunk_path, remainder, full_shards, 'f'))
-                        dbmgr.execute_command(file_command % (project, chunk_path, remainder, full_shards, 'f'))
-                        logging.info("Finished adding file to database for %s." % file_path)
-                        logging.debug("Adding large file: %s" % file_path)
-                    else:
-                        logging.info(file_command % (project, file_path, file_size, 0, 'f'))
-                        dbmgr.execute_command(file_command % (project, file_path, file_size, 0, 'f'))
-                        logging.info("Finished adding file to database for %s." % file_path )
-                        logging.debug("Adding small file: %s" % file_path)
-                        
-                    #
-                    # We could have a lot to process ... commit every 250K
-                    #
-                    if(counter == 250000):
-                        dbmgr.db_bulk_commit()
-                        counter = 0
-                    else:
-                        counter += 1
+                    futures.append(executor.submit(handle_file, dbmgr, file_path, chunk_size, project))
+                    
+            for future in futures:
+                future.result()
+                
             status_close = """
                 UPDATE ptolemy_projects SET status = 'completed scan' WHERE project = \'%s\';
                 """
