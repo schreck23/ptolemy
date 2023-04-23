@@ -149,7 +149,6 @@ def handle_file(dbmgr, path, chunk_size, project):
 #
 def scan_task(project: str):
 
-    counter = 0    
     dbmgr = dbmanager.DbManager()
     futures = []
 
@@ -159,10 +158,6 @@ def scan_task(project: str):
             SELECT shard_size, target_dir FROM ptolemy_projects WHERE project = \'%s\';
             """
         metadata = dbmgr.exe_fetch_one(meta_command % project)
-        
-        file_command = """
-            INSERT INTO %s(file_id, is_encrypted, size, is_processed, carfile, cid, shard_index, needs_sharding) VALUES(\'%s\', 'f', %i, 'f', ' ', ' ', %i, \'%s\');
-            """
         
         # Make sure we get something back or fire out a 404
         if(len(metadata) > 0):
