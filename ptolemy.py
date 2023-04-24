@@ -35,7 +35,7 @@ ip_address = config.get('orchestrator', 'ip_addr')
 run_port = config.get('orchestrator', 'port')
 orch_workers = config.get('orchestrator', 'api_threads')
 
-executor = ThreadPoolExecutor(int(config.get('ptolemy', 'threads')))
+executor = ThreadPoolExecutor(int(config.get('orchestrator', 'threads')))
 
 # Run the application
 if __name__ == '__main__':
