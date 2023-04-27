@@ -115,6 +115,3 @@ example on ZFS systems with directories containing a single small file it
 can causes inflated capacity usage numbers and make carfiles significantly 
 larger in size due to this behavior.  It is recommended that this behavior be 
 tracked and potentially an xfs or ext4 type of filesystem is used.
-
-![image002](https://user-images.githubusercontent.com/124812922/234964093-f805e393-6876-4dfc-9751-4d617dfc4ccf.jpg)
-
