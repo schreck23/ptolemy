@@ -269,6 +269,8 @@ worker.ini file.
     - Updates for logging and better state management and error pathing 
     (still a WIP)
     
+    - Encryption support
+    
     Ptolemy V2 plans:
     
     - Other cloud targets (potentially Azure and GCP and others)
