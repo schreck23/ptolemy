@@ -3,6 +3,9 @@
 """
 Created on Wed Mar 15 20:02:04 2023
 
+VERSION: 0.0 (Beta)
+
+
 @author: wfschrec
 """
 
