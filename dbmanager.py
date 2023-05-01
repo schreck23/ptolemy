@@ -17,8 +17,6 @@ formatter = config.get('logging', 'format')
 datefmt = config.get('logging', 'datefmt')
 logfile = config.get('logging', 'logfile')
                                                                     
-logging.basicConfig(handlers=[RotatingFileHandler(logfile, maxBytes=1000000000, backupCount=10)], format=formatter, datefmt=datefmt)
-
 log_level = config.get('logging', 'log_level')
 logging.getLogger().setLevel(log_level)
 
