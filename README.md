@@ -120,7 +120,7 @@ worker.ini file.
     share a common logfile.
     
     log_level -> The desired logging level we wish to use, options include 
-    INFO, DEBUG, WARN, ERROR & CRITICAL
+    INFO, DEBUG, WARNING, ERROR & CRITICAL
     
     format -> used to configure the format of the log message
     
@@ -269,8 +269,6 @@ worker.ini file.
     - Updates for logging and better state management and error pathing 
     (still a WIP)
     
-    - Encryption support
-    
     Ptolemy V2 plans:
     
     - Other cloud targets (potentially Azure and GCP and others)
@@ -278,18 +276,3 @@ worker.ini file.
     - Car v2 support
     
     - Direct to delta integration for end to end automated pipeline flow
-    
-    CONSTRAINTS
-    
-    - Ptolemy will only allow unique project names, in order to properly correlate 
-    metadata an attempt to reuse a project name will be rejected and the 
-    project will not be defined.
-
-    - Due to naming conventions Ptolemy will only allow letters and numbers for a 
-    project name.
-    
-    - Whole intergers are the only proper values for car and shard sizing.  Floating
-    point numbers will be rejected.
-    
-    - Encryption value of None is default and in the future will be a field for 
-    a key alias in the future.
