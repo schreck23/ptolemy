@@ -18,6 +18,7 @@ datefmt = config.get('logging', 'datefmt')
 logfile = config.get('logging', 'logfile')
                                                                     
 log_level = config.get('logging', 'log_level')
+logging.basicConfig(filename=logfile, encoding='utf-8')
 logging.getLogger().setLevel(log_level)
 
 class DbManager:
