@@ -114,10 +114,10 @@ def process_car(cariter, project):
         
     dbconf = configparser.ConfigParser()
     dbconf.read('database.ini')
-    host = config.get('database','host')
-    dbname = config.get('database','db_name')
-    user = config.get('database','db_user')
-    passwd = config.get('database','pass')    
+    host = dbconf.get('database','host')
+    dbname = dbconf.get('database','db_name')
+    user = dbconf.get('database','db_user')
+    passwd = dbconf.get('database','pass')    
     
     conn = psycopg2.connect(host=host, database=dbname, user=user, password=passwd)
     cursor = conn.cursor()    
