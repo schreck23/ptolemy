@@ -16,13 +16,11 @@ config.read('logging.ini')
 formatter = config.get('logging', 'format')
 datefmt = config.get('logging', 'datefmt')
 logfile = config.get('logging', 'logfile')
-
-logging.basicConfig(handlers=[RotatingFileHandler(logfile, maxBytes=100000000, backupCount=10)], format=formatter, datefmt=datefmt)
+                                                                    
+logging.basicConfig(handlers=[RotatingFileHandler(logfile, maxBytes=1000000000, backupCount=10)], format=formatter, datefmt=datefmt)
 
 log_level = config.get('logging', 'log_level')
 logging.getLogger().setLevel(log_level)
-
-#logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO, filename='/tmp/ptolemy.log')
 
 class DbManager:
 
@@ -30,8 +28,14 @@ class DbManager:
     # Initiator that spawns a connection to our local database
     #
     def __init__(self):
-
-        self.conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+        
+        dbconf = configparser.ConfigParser()
+        dbconf.read('database.ini')
+        host = config.get('database','host')
+        dbname = config.get('database','db_name')
+        user = config.get('database','db_user')
+        passwd = config.get('database','pass')
+        self.conn = psycopg2.connect(host=host, database=dbname, user=user, password=passwd)
         self.cursor = self.conn.cursor()
 
     #

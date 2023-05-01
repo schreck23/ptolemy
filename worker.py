@@ -17,10 +17,6 @@ import shutil
 import subprocess
 import re
 from fastapi import FastAPI, BackgroundTasks
-#from pydantic import BaseModel
-#from fastapi import FastAPI, File, UploadFile, status, HTTPException, BackgroundTasks
-#from multiprocessing import Pool
-#from multiprocessing import set_start_method
 import psycopg2
 from concurrent.futures.thread import ThreadPoolExecutor
 
@@ -108,9 +104,6 @@ def split_file(file_id, piece_size, staging_dir):
 #
 def process_car(cariter, project):
         
-    # Tap into the queue and we will pop the car entry off below once complete.
-    global the_highway
-    
     # Command to get the list of car files we are building
     list_command = """
         SELECT file_id, size FROM %s WHERE carfile = \'%s\' ;
@@ -119,7 +112,14 @@ def process_car(cariter, project):
         SELECT staging_dir, shard_size FROM ptolemy_projects WHERE project = \'%s\';
         """
         
-    conn = psycopg2.connect(host="localhost", database="ptolemy", user="repository", password="ptolemy")
+    dbconf = configparser.ConfigParser()
+    dbconf.read('database.ini')
+    host = config.get('database','host')
+    dbname = config.get('database','db_name')
+    user = config.get('database','db_user')
+    passwd = config.get('database','pass')    
+    
+    conn = psycopg2.connect(host=host, database=dbname, user=user, password=passwd)
     cursor = conn.cursor()    
 
     cursor.execute(project_command % project)
@@ -224,7 +224,7 @@ def blitz_build(project: str, background_tasks: BackgroundTasks):
 # Run the blitz
 #
 def blitz(project: str):
-    #global the_highway
+    
     executor = ThreadPoolExecutor(int(config.get('worker', 'threads')))
     futures = []
 
