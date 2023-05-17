@@ -111,13 +111,18 @@ def process_car(cariter, project):
     project_command = """
         SELECT staging_dir, shard_size FROM ptolemy_projects WHERE project = \'%s\';
         """
-        
+    
+    global config    
+    car_util = config.get('worker','car_gen')
+    stream_util = config.get('worker', 'commp')
+    
     dbconf = configparser.ConfigParser()
     dbconf.read('database.ini')
     host = dbconf.get('database','host')
     dbname = dbconf.get('database','db_name')
     user = dbconf.get('database','db_user')
     passwd = dbconf.get('database','pass')    
+    
     
     conn = psycopg2.connect(host=host, database=dbname, user=user, password=passwd)
     cursor = conn.cursor()    
@@ -174,12 +179,12 @@ def process_car(cariter, project):
     
         car_path = os.path.join(project_meta[0], cariter)
         
-        command = "/home/shrek/go/bin/car c --version 1 -f %s.car %s"
+        command = car_util + " c --version 1 -f %s.car %s"
         logging.info("Executing command go-car for dir %s" % cariter)
         result = subprocess.run(command % (car_path, car_path), capture_output=True, shell=True)
     
-        stream_cmd = "cat %s | /home/shrek/go/bin/stream-commp"
-        root_cmd = "/home/shrek/go/bin/car root %s"
+        stream_cmd = "cat %s | " + stream_util
+        root_cmd = car_util + " root %s"
         logging.info("Calculating root CID and commp for %s" % cariter)
         target_car = os.path.join(project_meta[0], cariter + ".car")
         root_result = subprocess.run((root_cmd % target_car), capture_output=True, shell=True, text=True)
