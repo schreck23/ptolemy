@@ -16,10 +16,11 @@ config.read('logging.ini')
 formatter = config.get('logging', 'format')
 datefmt = config.get('logging', 'datefmt')
 logfile = config.get('logging', 'logfile')
-                                                                    
+
 log_level = config.get('logging', 'log_level')
 logging.basicConfig(filename=logfile, encoding='utf-8')
 logging.getLogger().setLevel(log_level)
+
 
 class DbManager:
 
@@ -27,14 +28,15 @@ class DbManager:
     # Initiator that spawns a connection to our local database
     #
     def __init__(self):
-        
+
         dbconf = configparser.ConfigParser()
         dbconf.read('database.ini')
-        host = dbconf.get('database','host')
-        dbname = dbconf.get('database','db_name')
-        user = dbconf.get('database','db_user')
-        passwd = dbconf.get('database','pass')
-        self.conn = psycopg2.connect(host=host, database=dbname, user=user, password=passwd)
+        host = dbconf.get('database', 'host')
+        dbname = dbconf.get('database', 'db_name')
+        user = dbconf.get('database', 'db_user')
+        passwd = dbconf.get('database', 'pass')
+        self.conn = psycopg2.connect(
+            host=host, database=dbname, user=user, password=passwd)
         self.cursor = self.conn.cursor()
 
     #
@@ -54,8 +56,8 @@ class DbManager:
             self.cursor.execute(command)
         except(Exception, psycopg2.DatabaseError) as error:
             self.conn.rollback()
-            logging.error(error) 
-            
+            logging.error(error)
+
     #
     # Used to execute a command and return a solitary result
     #
@@ -65,8 +67,8 @@ class DbManager:
             result = self.cursor.fetchone()
             return result
         except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error) 
-    
+            logging.error(error)
+
     #
     # Used to execute a command and return all results
     #
@@ -76,8 +78,8 @@ class DbManager:
             result = self.cursor.fetchall()
             return result
         except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error) 
-            
+            logging.error(error)
+
     #
     # Used to execute a command and return a specified number of results
     #
@@ -87,8 +89,8 @@ class DbManager:
             result = self.cursor.fetchmany(count)
             return result
         except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error) 
-            
+            logging.error(error)
+
     #
     # Used to execute a command and return a specified number of results
     #
@@ -96,8 +98,8 @@ class DbManager:
         try:
             self.cursor.close()
         except(Exception, psycopg2.DatabaseError) as error:
-            logging.error(error)     
-                        
+            logging.error(error)
+
     #
     # Method used to commit a series of transactions in bulk
     #
@@ -114,7 +116,7 @@ class DbManager:
     def close_db_conn(self):
 
         if self.conn is not None:
-            self.conn.close()    
+            self.conn.close()
 
     #
     #
