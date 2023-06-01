@@ -53,7 +53,7 @@ worker.ini file.
     # (note) - you can create a db with any name and user account with any
     # credentials you wish, however the database.ini will need to be updated
     # based on those parameters
-    sudo -u postgres createuser -d -s repository
+    sudo -u postgres createuser -d -s ptolemy
     sudo -u postgres psql -c "ALTER USER repository PASSWORD 'ptolemy'";
     sudo -u postgres createdb ptolemy
     
